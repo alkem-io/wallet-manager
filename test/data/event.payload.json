@@ -1,0 +1,12 @@
+{
+  "eventPayload": {
+    "pattern": "authorizationRequest",
+    "data": {
+      "userAgentID": "f0a47bad-eca5-4942-84ac-4dc9f085b7b8",
+      "resource": {
+        "type": "ecoverse",
+        "id": "d0e47bad-eca5-4942-84ac-4dc9f085b7b2"
+      }
+    }
+  }
+}
