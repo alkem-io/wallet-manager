@@ -1,14 +1,14 @@
 version: '3.7'
 
 networks:
-  alkemio_notifications_net:
+  alkemio_wallet_manager_net:
 
 services:
-  alkemio_notifications:
+  alkemio_wallet_manager:
     extra_hosts:
       - 'host.docker.internal:host-gateway'
-    container_name: alkemio_notifications
-    image: alkemio_notifications
+    container_name: alkemio_wallet_manager
+    image: alkemio_wallet_manager
     build: .
     environment:
       - EMAIL_SMTP_HOST
@@ -16,6 +16,6 @@ services:
       - LOGGING_CONSOLE_ENABLED
       - LOGGING_LEVEL_CONSOLE
     networks:
-      - alkemio_notifications_net
+      - alkemio_wallet_manager_net
     restart: always
     command: npm run start
