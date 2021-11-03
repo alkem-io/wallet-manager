@@ -11,7 +11,6 @@ services:
     image: alkemio_wallet_manager
     build: .
     environment:
-      - EMAIL_SMTP_HOST
       - RABBITMQ_HOST
       - LOGGING_CONSOLE_ENABLED
       - LOGGING_LEVEL_CONSOLE
