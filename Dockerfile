@@ -28,5 +28,7 @@ RUN npm run build
 
 ENV NODE_ENV=${ENV_ARG}
 
-EXPOSE ${GRAPHQL_ENDPOINT_PORT_ARG}
+ADD .scripts/create_db.sh /create_db.sh
+RUN chmod +x /create_db.sh
+
 CMD ["/bin/sh", "-c", "npm run start:prod"]
