@@ -11,11 +11,12 @@ import { LogContext } from '@common/enums/logging.context';
 import stateModificationMetadata from '../credentials/state.modification.credential.metadata';
 import { ConfigService } from '@nestjs/config';
 import { ConfigurationTypes } from '@common/enums';
-import { Agent, VerifiedCredential } from '@src/types';
 import { NotEnabledException } from '@src/common';
 import { CredentialOfferRequestAttrs } from 'jolocom-lib/js/interactionTokens/types';
 import { CredentialQuery, IStorage } from '@jolocom/sdk/js/storage';
 import { CredentialOfferFlowState } from '@jolocom/sdk/js/interactionManager/types';
+import { VerifiedCredential } from '@src/types/verified.credential';
+import { Agent } from '@src/types/agent';
 
 @Injectable()
 export class SsiAgentService {
@@ -35,7 +36,6 @@ export class SsiAgentService {
   async createAgent(password: string): Promise<string> {
     const agent = await this.jolocomSDK.createAgent(password, 'jun');
     return agent.identityWallet.did;
-    // return password;
   }
 
   async loadDidDoc(did: string, password: string): Promise<string> {
@@ -43,7 +43,6 @@ export class SsiAgentService {
     const didDocAttrs = agent.identityWallet.didDocument.toJSON();
     const didDocAttrsJson = JSON.stringify(didDocAttrs, null, 2);
     return didDocAttrsJson;
-    // return did;
   }
 
   async getVerifiedCredentials(

@@ -8,6 +8,7 @@ import { ConfigurationTypes } from './common';
 import { WinstonConfigService } from './config';
 import configuration from './config/configuration';
 import { HttpExceptionsFilter } from './core';
+import { SsiAgentModule } from './services/agent/ssi.agent.module';
 
 @Module({
   imports: [
@@ -24,14 +25,13 @@ import { HttpExceptionsFilter } from './core';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => ({
-        type: 'mysql', //todo: switch to mysql when issue is addressed.
+        type: 'mysql',
         insecureAuth: true,
-        synchronize: true /* note: only for demo */,
+        synchronize: true /*toDo - move to migrations */,
         cache: true,
         entities: [
           'node_modules/@jolocom/sdk-storage-typeorm/js/src/entities/*.js',
         ],
-        // NOTE: these are in until jolocom fixes the name issue on typeorm-mysql.
         host: configService.get(ConfigurationTypes.IDENTITY)?.ssi.jolocom
           .database?.host,
         port: configService.get(ConfigurationTypes.IDENTITY)?.ssi.jolocom
@@ -45,9 +45,9 @@ import { HttpExceptionsFilter } from './core';
 
         logging: configService.get(ConfigurationTypes.IDENTITY)?.ssi.jolocom
           .database?.logging,
-        // database: './jolocom.sqlite3',
       }),
     }),
+    SsiAgentModule,
   ],
   providers: [
     {
