@@ -172,4 +172,8 @@ export class SsiAgentService {
     );
     return true;
   }
+
+  async grantCredential(payload: any): Promise<boolean> {
+    return false;
+  }
 }

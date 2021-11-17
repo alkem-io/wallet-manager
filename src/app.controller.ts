@@ -29,6 +29,7 @@ export class AppController {
       },
       error => {
         this.logger.error(`Error when acquiring DID: ${error}`, LogContext.SSI);
+        channel.ack(originalMsg);
       }
     );
   }
@@ -41,11 +42,23 @@ export class AppController {
     channel.ack(originalMsg);
   }
 
-  @MessagePattern({ cmd: 'assignCredential' })
+  @MessagePattern({ cmd: 'grantCredential' })
   async assignCredential(@Payload() data: any, @Ctx() context: RmqContext) {
     const channel = context.getChannelRef();
     const originalMsg = context.getMessage();
 
-    channel.ack(originalMsg);
+    this.ssiAgentService.grantCredential(data).then(
+      res => {
+        channel.ack(originalMsg);
+        return res;
+      },
+      error => {
+        this.logger.error(
+          `Error when granting credential: ${error}`,
+          LogContext.SSI
+        );
+        channel.ack(originalMsg);
+      }
+    );
   }
 }
