@@ -2,7 +2,7 @@
   "name": "alkemio-wallet-manager",
   "version": "0.1.0",
   "description": "Alkemio wallet manager",
-  "author": "Cherrytwist Foundation",
+  "author": "Alkemio Foundation",
   "private": false,
   "license": "EUPL-1.2",
   "main": "src/main.ts",
