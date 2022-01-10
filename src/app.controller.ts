@@ -4,6 +4,7 @@ import {
   MessagePattern,
   Payload,
   RmqContext,
+  RpcException,
 } from '@nestjs/microservices';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { LogContext } from './common';
@@ -26,16 +27,16 @@ export class AppController {
     const channel = context.getChannelRef();
     const originalMsg = context.getMessage();
 
-    this.ssiAgentService.createAgent(data.password).then(
-      did => {
+    this.ssiAgentService
+      .createAgent(data.password)
+      .then(did => {
         channel.ack(originalMsg);
         return did;
-      },
-      error => {
+      })
+      .catch((error: any) => {
         this.logger.error(`Error when acquiring DID: ${error}`, LogContext.SSI);
         channel.ack(originalMsg);
-      }
-    );
+      });
   }
 
   @MessagePattern({ cmd: 'getIdentityInfo' })
@@ -47,7 +48,18 @@ export class AppController {
     const channel = context.getChannelRef();
     const originalMsg = context.getMessage();
 
-    channel.ack(originalMsg);
+    this.ssiAgentService
+      .getVerifiedCredentials(data.did, data.password)
+      .then(identityInfo => {
+        channel.ack(originalMsg);
+        return identityInfo;
+      })
+      .catch((error: any) => {
+        this.logger.error(`Error when acquiring DID: ${error}`, LogContext.SSI);
+        channel.ack(originalMsg);
+        throw new RpcException(error);
+        // return new RpcException(error);
+      });
   }
 
   @MessagePattern({ cmd: 'grantCredential' })
@@ -59,18 +71,18 @@ export class AppController {
     const channel = context.getChannelRef();
     const originalMsg = context.getMessage();
 
-    this.ssiAgentService.grantCredential(data).then(
-      res => {
+    this.ssiAgentService
+      .grantCredential(data)
+      .then(res => {
         channel.ack(originalMsg);
         return res;
-      },
-      error => {
+      })
+      .catch((error: any) => {
         this.logger.error(
           `Error when granting credential: ${error}`,
           LogContext.SSI
         );
         channel.ack(originalMsg);
-      }
-    );
+      });
   }
 }
