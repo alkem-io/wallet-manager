@@ -48,31 +48,26 @@ export class SsiAgentService {
   async getVerifiedCredentials(
     did: string,
     password: string
-    // ): Promise<VerifiedCredential[]> {
-  ): Promise<any> {
-    return {
-      data: 'test',
-    };
-    // const credentialsResult: VerifiedCredential[] = [];
-
-    // const agent = await this.jolocomSDK.loadAgent(password, did);
-    // const query: CredentialQuery = {};
-    // const credentials = await agent.credentials.query(query);
-    // for (const credential of credentials) {
-    //   const claim = credential.claim;
-    //   const verifiedCredential: VerifiedCredential = {
-    //     claim: JSON.stringify(claim),
-    //     issuer: credential.issuer,
-    //     type: credential.type[1],
-    //     issued: credential.issued,
-    //   };
-    //   credentialsResult.push(verifiedCredential);
-    //   this.logger.verbose?.(
-    //     `${JSON.stringify(credential.claim)}`,
-    //     LogContext.AUTH
-    //   );
-    // }
-    // return credentialsResult;
+  ): Promise<VerifiedCredential[]> {
+    const credentialsResult: VerifiedCredential[] = [];
+    const agent = await this.jolocomSDK.loadAgent(password, did);
+    const query: CredentialQuery = {};
+    const credentials = await agent.credentials.query(query);
+    for (const credential of credentials) {
+      const claim = credential.claim;
+      const verifiedCredential: VerifiedCredential = {
+        claim: JSON.stringify(claim),
+        issuer: credential.issuer,
+        type: credential.type[1],
+        issued: credential.issued,
+      };
+      credentialsResult.push(verifiedCredential);
+      this.logger.verbose?.(
+        `${JSON.stringify(credential.claim)}`,
+        LogContext.AUTH
+      );
+    }
+    return credentialsResult;
   }
 
   async grantStateTransitionVC(

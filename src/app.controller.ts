@@ -27,16 +27,17 @@ export class AppController {
     const channel = context.getChannelRef();
     const originalMsg = context.getMessage();
 
-    this.ssiAgentService
-      .createAgent(data.password)
-      .then(did => {
-        channel.ack(originalMsg);
-        return did;
-      })
-      .catch((error: any) => {
-        this.logger.error(`Error when acquiring DID: ${error}`, LogContext.SSI);
-        channel.ack(originalMsg);
-      });
+    try {
+      const did = await this.ssiAgentService.createAgent(data.password);
+      channel.ack(originalMsg);
+
+      return did;
+    } catch (error) {
+      const errorMessage = `Error when creating identity: ${error}`;
+      this.logger.error(errorMessage, LogContext.SSI);
+      channel.ack(originalMsg);
+      throw new RpcException(errorMessage);
+    }
   }
 
   @MessagePattern({ cmd: 'getIdentityInfo' })
@@ -48,18 +49,20 @@ export class AppController {
     const channel = context.getChannelRef();
     const originalMsg = context.getMessage();
 
-    this.ssiAgentService
-      .getVerifiedCredentials(data.did, data.password)
-      .then(identityInfo => {
-        channel.ack(originalMsg);
-        return identityInfo;
-      })
-      .catch((error: any) => {
-        this.logger.error(`Error when acquiring DID: ${error}`, LogContext.SSI);
-        channel.ack(originalMsg);
-        throw new RpcException(error);
-        // return new RpcException(error);
-      });
+    try {
+      const identityInfo = await this.ssiAgentService.getVerifiedCredentials(
+        data.did,
+        data.password
+      );
+
+      channel.ack(originalMsg);
+      return identityInfo;
+    } catch (error) {
+      const errorMessage = `Error when acquiring DID: ${error}`;
+      this.logger.error(errorMessage, LogContext.SSI);
+      channel.ack(originalMsg);
+      throw new RpcException(errorMessage);
+    }
   }
 
   @MessagePattern({ cmd: 'grantCredential' })
@@ -71,18 +74,18 @@ export class AppController {
     const channel = context.getChannelRef();
     const originalMsg = context.getMessage();
 
-    this.ssiAgentService
-      .grantCredential(data)
-      .then(res => {
-        channel.ack(originalMsg);
-        return res;
-      })
-      .catch((error: any) => {
-        this.logger.error(
-          `Error when granting credential: ${error}`,
-          LogContext.SSI
-        );
-        channel.ack(originalMsg);
-      });
+    try {
+      const credentialGranted = await this.ssiAgentService.grantCredential(
+        data
+      );
+
+      channel.ack(originalMsg);
+      return credentialGranted;
+    } catch (error) {
+      const errorMessage = `Error when granting credential: ${error}`;
+      this.logger.error(errorMessage, LogContext.SSI);
+      channel.ack(originalMsg);
+      throw new RpcException(errorMessage);
+    }
   }
 }
