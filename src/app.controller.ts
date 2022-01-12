@@ -21,8 +21,8 @@ export class AppController {
   @MessagePattern({ cmd: 'createIdentity' })
   async createIdentity(@Payload() data: any, @Ctx() context: RmqContext) {
     this.logger.verbose?.(
-      `msg received: createIdentity - ${JSON.stringify(data)}`,
-      LogContext.UNSPECIFIED
+      `createIdentity - payload: ${JSON.stringify(data)}`,
+      LogContext.EVENT
     );
     const channel = context.getChannelRef();
     const originalMsg = context.getMessage();
@@ -43,8 +43,8 @@ export class AppController {
   @MessagePattern({ cmd: 'getIdentityInfo' })
   async getIdentityInfo(@Payload() data: any, @Ctx() context: RmqContext) {
     this.logger.verbose?.(
-      `msg received: getIdentityInfo - ${JSON.stringify(data)}`,
-      LogContext.UNSPECIFIED
+      `getIdentityInfo - payload: ${JSON.stringify(data)}`,
+      LogContext.EVENT
     );
     const channel = context.getChannelRef();
     const originalMsg = context.getMessage();
@@ -68,8 +68,8 @@ export class AppController {
   @MessagePattern({ cmd: 'grantCredential' })
   async assignCredential(@Payload() data: any, @Ctx() context: RmqContext) {
     this.logger.verbose?.(
-      `msg received: grantCredential - ${JSON.stringify(data)}`,
-      LogContext.UNSPECIFIED
+      `grantCredential - payload: ${JSON.stringify(data)}`,
+      LogContext.EVENT
     );
     const channel = context.getChannelRef();
     const originalMsg = context.getMessage();
