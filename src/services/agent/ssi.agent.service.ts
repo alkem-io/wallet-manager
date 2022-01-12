@@ -50,7 +50,6 @@ export class SsiAgentService {
     password: string
   ): Promise<VerifiedCredential[]> {
     const credentialsResult: VerifiedCredential[] = [];
-
     const agent = await this.jolocomSDK.loadAgent(password, did);
     const query: CredentialQuery = {};
     const credentials = await agent.credentials.query(query);
