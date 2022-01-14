@@ -1,0 +1,13 @@
+component_depth: 4
+languages:
+  - typescript
+  - javascript
+  - script
+exclude:
+  - /src/config/.*
+  - /.scripts/.*
+  - /.build/.*
+  - .*/*.resolver.*
+  - .*/*.entity.*
+  - .*/*.dto.*
+  - .*/*.exception.*

@@ -4,4 +4,5 @@ export enum ConfigurationTypes {
   HOSTING = 'hosting',
   ALKEMIO = 'alkemio',
   KRATOS = 'kratos',
+  IDENTITY = 'identity',
 }

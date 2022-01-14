@@ -6,8 +6,6 @@ module.exports = {
     '@src/(.*)': ['<rootDir>/src/$1'],
     '@test/(.*)': ['<rootDir>/test/$1'],
     '@services/(.*)': ['<rootDir>/src/services/$1'],
-    '@constants': ['<rootDir>/src/common/constants'],
-    '@constants/(.*)': ['<rootDir>/src/common/constants/$1'],
   },
   moduleFileExtensions: ['js', 'json', 'ts'],
   rootDir: '../../',
