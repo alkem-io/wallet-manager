@@ -1,6 +1,6 @@
 {
   "name": "alkemio-wallet-manager",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Alkemio wallet manager",
   "author": "Alkemio Foundation",
   "private": false,
@@ -39,6 +39,7 @@
     "@nestjs/config": "^0.5.0",
     "@nestjs/core": "^7.6.15",
     "@nestjs/microservices": "^7.6.18",
+    "@nestjs/platform-express": "^7.6.15",
     "@nestjs/typeorm": "^7.1.5",
     "amqp-connection-manager": "^3.7.0",
     "amqplib": "^0.8.0",
