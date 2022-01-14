@@ -88,4 +88,37 @@ export class AppController {
       throw new RpcException(errorMessage);
     }
   }
+
+  @MessagePattern({ cmd: 'grantStateTransitionVC' })
+  async grantStateTransitionVC(
+    @Payload() data: any,
+    @Ctx() context: RmqContext
+  ) {
+    this.logger.verbose?.(
+      `grantStateTransitionVC - payload: ${JSON.stringify(data)}`,
+      LogContext.EVENT
+    );
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+
+    try {
+      const credentialGranted =
+        await this.ssiAgentService.grantStateTransitionVC(
+          data.issuerDid,
+          data.issuerPW,
+          data.receiverDid,
+          data.receiverPw,
+          data.challengeID,
+          data.userID
+        );
+
+      channel.ack(originalMsg);
+      return credentialGranted;
+    } catch (error) {
+      const errorMessage = `Error when granting credential: ${error}`;
+      this.logger.error(errorMessage, LogContext.SSI);
+      channel.ack(originalMsg);
+      throw new RpcException(errorMessage);
+    }
+  }
 }
