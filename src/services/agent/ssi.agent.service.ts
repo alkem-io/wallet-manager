@@ -1,22 +1,47 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { Connection } from 'typeorm';
-import { Inject, Injectable, LoggerService } from '@nestjs/common';
-import { InjectConnection } from '@nestjs/typeorm';
-import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import { ConfigurationTypes } from '@common/enums';
+import { LogContext } from '@common/enums/logging.context';
 import { JolocomSDK } from '@jolocom/sdk';
 import { JolocomTypeormStorage } from '@jolocom/sdk-storage-typeorm';
-
-import { LogContext } from '@common/enums/logging.context';
-
-import stateModificationMetadata from '../credentials/state.modification.credential.metadata';
-import { ConfigService } from '@nestjs/config';
-import { ConfigurationTypes } from '@common/enums';
-import { NotEnabledException } from '@src/common';
-import { CredentialOfferRequestAttrs } from 'jolocom-lib/js/interactionTokens/types';
-import { CredentialQuery, IStorage } from '@jolocom/sdk/js/storage';
 import { CredentialOfferFlowState } from '@jolocom/sdk/js/interactionManager/types';
-import { VerifiedCredential } from '@src/types/verified.credential';
+import { CredentialQuery, IStorage } from '@jolocom/sdk/js/storage';
+import {
+  BadRequestException,
+  CACHE_MANAGER,
+  Inject,
+  Injectable,
+  LoggerService,
+  PreconditionFailedException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { InjectConnection } from '@nestjs/typeorm';
+import { NotEnabledException } from '@src/common';
 import { Agent } from '@src/types/agent';
+import { VerifiedCredential } from '@src/types/verified.credential';
+import { Cache } from 'cache-manager';
+import { constraintFunctions } from 'jolocom-lib/js/interactionTokens/credentialRequest';
+import { CredentialOfferRequestAttrs } from 'jolocom-lib/js/interactionTokens/types';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import { Connection } from 'typeorm';
+import CredentialMetadata from '../credentials';
+import { RecognizedCredentials } from '../credentials/recongized.credentials';
+import stateModificationMetadata from '../credentials/state.modification.credential.metadata';
+import {
+  CredentialShareRequestDTO,
+  CredentialShareResponseDTO,
+  StoreSharedCredentialsDTO,
+} from '../interactions/credential.request.interaction';
+
+export const generateRequirementsFromConfig = ({
+  issuer,
+  metadata,
+}: {
+  issuer?: string;
+  metadata: { type: string[] };
+}) => ({
+  type: metadata.type,
+  constraints: issuer ? [constraintFunctions.is('issuer', issuer)] : [],
+});
 
 @Injectable()
 export class SsiAgentService {
@@ -27,7 +52,9 @@ export class SsiAgentService {
     private typeormConnection: Connection,
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: LoggerService,
-    private configService: ConfigService
+    private configService: ConfigService,
+    @Inject(CACHE_MANAGER)
+    private cacheManager: Cache
   ) {
     const storage: IStorage = new JolocomTypeormStorage(this.typeormConnection);
     this.jolocomSDK = new JolocomSDK({ storage });
@@ -91,7 +118,7 @@ export class SsiAgentService {
       callbackURL: 'https://example.com/issuance',
       offeredCredentials: [
         {
-          type: 'StateModificationCredential',
+          type: RecognizedCredentials.StateModificationCredential,
         },
       ],
     };
@@ -105,7 +132,7 @@ export class SsiAgentService {
     // Receiver then creates a response token
     const receiverCredExchangeResponse =
       await receiverCredExchangeInteraction.createCredentialOfferResponseToken([
-        { type: 'StateModificationCredential' },
+        { type: RecognizedCredentials.StateModificationCredential },
       ]);
 
     // Note that all agents need to also process the tokens they generate so that their interaction manager has seen all messages
@@ -174,5 +201,116 @@ export class SsiAgentService {
 
   async grantCredential(payload: any): Promise<boolean> {
     return false;
+  }
+
+  // buildPublicHttpUrl(
+  //   path: string,
+  //   publicHostport?: string,
+  //   tlsEnabled?: boolean
+  // ) {
+  //   const protocol = tlsEnabled ? 'https' : 'http';
+  //   const root = publicHostport || 'localhost';
+  //   return `${protocol}://${root}${path}`;
+  // }
+
+  // buildInteractionUrl(
+  //   path: string,
+  //   publicHostport?: string,
+  //   tlsEnabled?: boolean
+  // ) {
+  //   return `${this.buildPublicHttpUrl(
+  //     path,
+  //     publicHostport,
+  //     tlsEnabled
+  //   )}/interxn/${v4()}`;
+  // }
+
+  async generateCredentialShareRequest(
+    payload: CredentialShareRequestDTO
+  ): Promise<CredentialShareResponseDTO> {
+    const ssiEnabled = this.configService.get(ConfigurationTypes.IDENTITY).ssi
+      .enabled;
+    if (!ssiEnabled) {
+      throw new NotEnabledException('SSI is not enabled', LogContext.SSI);
+    }
+
+    const { types, uniqueCallbackURL, issuerDId, issuerPassword } = payload;
+
+    const credentialTypes = types.filter(type => CredentialMetadata[type]);
+
+    if (credentialTypes.length === 0)
+      throw new BadRequestException('The credential types are not supported');
+
+    const issuerAgent = await this.jolocomSDK.loadAgent(
+      issuerPassword,
+      issuerDId
+    );
+
+    const credentialRequirements = credentialTypes.map(credType =>
+      generateRequirementsFromConfig({
+        metadata: CredentialMetadata[credType],
+        issuer: undefined, // add only platform verified issuers
+      })
+    );
+
+    const token = await issuerAgent.credRequestToken({
+      callbackURL: uniqueCallbackURL,
+      credentialRequirements,
+    });
+
+    const expiresOn = new Date();
+    expiresOn.setSeconds(900);
+    this.cacheManager.set<CredentialShareRequestDTO>(
+      token.nonce,
+      payload,
+      { ttl: 900 } // 15 mins
+    );
+
+    return {
+      interactionId: token.nonce,
+      jwt: token.encode(),
+      expiresOn: expiresOn.getTime(),
+    };
+  }
+
+  async storeSharedCredentials(
+    payload: StoreSharedCredentialsDTO
+  ): Promise<boolean> {
+    const ssiEnabled = this.configService.get(ConfigurationTypes.IDENTITY).ssi
+      .enabled;
+    if (!ssiEnabled) {
+      throw new NotEnabledException('SSI is not enabled', LogContext.SSI);
+    }
+
+    const { offererDId, offererPassword, interactionId, jwt } = payload;
+
+    const request = await this.cacheManager.get<CredentialShareRequestDTO>(
+      interactionId
+    );
+
+    if (!request) {
+      throw new PreconditionFailedException(
+        `The interactionId could not be found: ${interactionId}`
+      );
+    }
+
+    const issuerAgent = await this.jolocomSDK.loadAgent(
+      request.issuerPassword,
+      request.issuerDId
+    );
+
+    const interaction = await issuerAgent.processJWT(jwt);
+    const credentials = await interaction.getVerifiableCredential();
+
+    const offererAgent = await this.jolocomSDK.loadAgent(
+      offererPassword,
+      offererDId
+    );
+
+    for (const credential of credentials) {
+      await offererAgent.storage.store.verifiableCredential(credential);
+    }
+
+    return true;
   }
 }

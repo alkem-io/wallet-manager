@@ -9,6 +9,10 @@ import {
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { LogContext } from './common';
 import { SsiAgentService } from './services/agent/ssi.agent.service';
+import {
+  CredentialShareRequestDTO,
+  StoreSharedCredentialsDTO,
+} from './services/interactions/credential.request.interaction';
 
 @Controller()
 export class AppController {
@@ -116,6 +120,58 @@ export class AppController {
       return credentialGranted;
     } catch (error) {
       const errorMessage = `Error when granting credential: ${error}`;
+      this.logger.error(errorMessage, LogContext.SSI);
+      channel.ack(originalMsg);
+      throw new RpcException(errorMessage);
+    }
+  }
+
+  @MessagePattern({ cmd: 'createShareCredentialRequest' })
+  async createShareCredentialRequest(
+    @Payload() data: CredentialShareRequestDTO,
+    @Ctx() context: RmqContext
+  ) {
+    this.logger.verbose?.(
+      `createShareCredentialRequest - payload: ${JSON.stringify(data)}`,
+      LogContext.EVENT
+    );
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+
+    try {
+      const credentialGranted =
+        await this.ssiAgentService.generateCredentialShareRequest(data);
+
+      channel.ack(originalMsg);
+      return credentialGranted;
+    } catch (error) {
+      const errorMessage = `Error when creating credential share request credential: ${error}`;
+      this.logger.error(errorMessage, LogContext.SSI);
+      channel.ack(originalMsg);
+      throw new RpcException(errorMessage);
+    }
+  }
+
+  @MessagePattern({ cmd: 'storeSharedCredentials' })
+  async storeSharedCredentials(
+    @Payload() data: StoreSharedCredentialsDTO,
+    @Ctx() context: RmqContext
+  ) {
+    this.logger.verbose?.(
+      `storeSharedCredentials - payload: ${JSON.stringify(data)}`,
+      LogContext.EVENT
+    );
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+
+    try {
+      const credentialGranted =
+        await this.ssiAgentService.storeSharedCredentials(data);
+
+      channel.ack(originalMsg);
+      return credentialGranted;
+    } catch (error) {
+      const errorMessage = `Error when storing credentials: ${error}`;
       this.logger.error(errorMessage, LogContext.SSI);
       channel.ack(originalMsg);
       throw new RpcException(errorMessage);
