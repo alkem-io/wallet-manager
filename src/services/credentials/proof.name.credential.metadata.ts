@@ -3,13 +3,12 @@ import { RecognizedCredentials } from './recongized.credentials';
 export default {
   type: [
     RecognizedCredentials.Credential,
-    RecognizedCredentials.StateModificationCredential,
+    RecognizedCredentials.ProofOfNameCredential,
   ],
-  name: 'Authorise changing state of an entity',
+  name: 'Proof of the credential holders name',
   context: [
     {
-      challengeID: 'schema:uuid',
-      userID: 'schema:uuid',
+      name: 'schema:name',
     },
   ],
 };

@@ -9,10 +9,7 @@ import {
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { LogContext } from './common';
 import { SsiAgentService } from './services/agent/ssi.agent.service';
-import {
-  CredentialShareRequestDTO,
-  StoreSharedCredentialsDTO,
-} from './services/interactions/credential.request.interaction';
+import { CredentialOfferDTO } from './services/interactions/credential.offer.interaction';
 
 @Controller()
 export class AppController {
@@ -126,13 +123,13 @@ export class AppController {
     }
   }
 
-  @MessagePattern({ cmd: 'createShareCredentialRequest' })
-  async createShareCredentialRequest(
-    @Payload() data: CredentialShareRequestDTO,
+  @MessagePattern({ cmd: 'issueVerifiedCredential' })
+  async issueVerifiedCredential(
+    @Payload() data: CredentialOfferDTO,
     @Ctx() context: RmqContext
   ) {
     this.logger.verbose?.(
-      `createShareCredentialRequest - payload: ${JSON.stringify(data)}`,
+      `issueVerifiedCredential - payload: ${JSON.stringify(data)}`,
       LogContext.EVENT
     );
     const channel = context.getChannelRef();
@@ -140,38 +137,12 @@ export class AppController {
 
     try {
       const credentialGranted =
-        await this.ssiAgentService.generateCredentialShareRequest(data);
+        await this.ssiAgentService.issueVerifiedCredential(data);
 
       channel.ack(originalMsg);
       return credentialGranted;
     } catch (error) {
-      const errorMessage = `Error when creating credential share request credential: ${error}`;
-      this.logger.error(errorMessage, LogContext.SSI);
-      channel.ack(originalMsg);
-      throw new RpcException(errorMessage);
-    }
-  }
-
-  @MessagePattern({ cmd: 'storeSharedCredentials' })
-  async storeSharedCredentials(
-    @Payload() data: StoreSharedCredentialsDTO,
-    @Ctx() context: RmqContext
-  ) {
-    this.logger.verbose?.(
-      `storeSharedCredentials - payload: ${JSON.stringify(data)}`,
-      LogContext.EVENT
-    );
-    const channel = context.getChannelRef();
-    const originalMsg = context.getMessage();
-
-    try {
-      const credentialGranted =
-        await this.ssiAgentService.storeSharedCredentials(data);
-
-      channel.ack(originalMsg);
-      return credentialGranted;
-    } catch (error) {
-      const errorMessage = `Error when storing credentials: ${error}`;
+      const errorMessage = `Error when issuing credentials: ${error}`;
       this.logger.error(errorMessage, LogContext.SSI);
       channel.ack(originalMsg);
       throw new RpcException(errorMessage);

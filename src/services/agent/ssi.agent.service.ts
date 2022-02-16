@@ -1,36 +1,29 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { ConfigurationTypes } from '@common/enums';
 import { LogContext } from '@common/enums/logging.context';
-import { JolocomSDK } from '@jolocom/sdk';
+import { Agent, JolocomSDK } from '@jolocom/sdk';
 import { JolocomTypeormStorage } from '@jolocom/sdk-storage-typeorm';
 import { CredentialOfferFlowState } from '@jolocom/sdk/js/interactionManager/types';
 import { CredentialQuery, IStorage } from '@jolocom/sdk/js/storage';
 import {
   BadRequestException,
-  CACHE_MANAGER,
   Inject,
   Injectable,
   LoggerService,
-  PreconditionFailedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectConnection } from '@nestjs/typeorm';
 import { NotEnabledException } from '@src/common';
-import { Agent } from '@src/types/agent';
+import { Agent as AlkemioAgent } from '@src/types/agent';
 import { VerifiedCredential } from '@src/types/verified.credential';
-import { Cache } from 'cache-manager';
 import { constraintFunctions } from 'jolocom-lib/js/interactionTokens/credentialRequest';
 import { CredentialOfferRequestAttrs } from 'jolocom-lib/js/interactionTokens/types';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Connection } from 'typeorm';
-import CredentialMetadata from '../credentials';
+import { CredentialMetadata, CredentialOffer } from '../credentials';
 import { RecognizedCredentials } from '../credentials/recongized.credentials';
 import stateModificationMetadata from '../credentials/state.modification.credential.metadata';
-import {
-  CredentialShareRequestDTO,
-  CredentialShareResponseDTO,
-  StoreSharedCredentialsDTO,
-} from '../interactions/credential.request.interaction';
+import { CredentialOfferDTO } from '../interactions/credential.offer.interaction';
 
 export const generateRequirementsFromConfig = ({
   issuer,
@@ -52,17 +45,19 @@ export class SsiAgentService {
     private typeormConnection: Connection,
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: LoggerService,
-    private configService: ConfigService,
-    @Inject(CACHE_MANAGER)
-    private cacheManager: Cache
+    private configService: ConfigService
   ) {
     const storage: IStorage = new JolocomTypeormStorage(this.typeormConnection);
     this.jolocomSDK = new JolocomSDK({ storage });
   }
 
   async createAgent(password: string): Promise<string> {
-    const agent = await this.jolocomSDK.createAgent(password, 'jun');
+    const agent = await this.jolocomSDK.createAgent(password, 'jolo');
     return agent.identityWallet.did;
+  }
+
+  async loadAgent(did: string, password: string): Promise<Agent> {
+    return await this.jolocomSDK.loadAgent(password, did);
   }
 
   async loadDidDoc(did: string, password: string): Promise<string> {
@@ -177,9 +172,9 @@ export class SsiAgentService {
   }
 
   async authorizeStateModification(
-    issuingAgent: Agent,
+    issuingAgent: AlkemioAgent,
     issuingResourceID: string,
-    receivingAgent: Agent,
+    receivingAgent: AlkemioAgent,
     receivingResourceID: string
   ): Promise<boolean> {
     const ssiEnabled = this.configService.get(ConfigurationTypes.IDENTITY).ssi
@@ -203,114 +198,97 @@ export class SsiAgentService {
     return false;
   }
 
-  // buildPublicHttpUrl(
-  //   path: string,
-  //   publicHostport?: string,
-  //   tlsEnabled?: boolean
-  // ) {
-  //   const protocol = tlsEnabled ? 'https' : 'http';
-  //   const root = publicHostport || 'localhost';
-  //   return `${protocol}://${root}${path}`;
-  // }
-
-  // buildInteractionUrl(
-  //   path: string,
-  //   publicHostport?: string,
-  //   tlsEnabled?: boolean
-  // ) {
-  //   return `${this.buildPublicHttpUrl(
-  //     path,
-  //     publicHostport,
-  //     tlsEnabled
-  //   )}/interxn/${v4()}`;
-  // }
-
-  async generateCredentialShareRequest(
-    payload: CredentialShareRequestDTO
-  ): Promise<CredentialShareResponseDTO> {
+  async issueVerifiedCredential(payload: CredentialOfferDTO) {
     const ssiEnabled = this.configService.get(ConfigurationTypes.IDENTITY).ssi
       .enabled;
     if (!ssiEnabled) {
       throw new NotEnabledException('SSI is not enabled', LogContext.SSI);
     }
 
-    const { types, uniqueCallbackURL, issuerDId, issuerPassword } = payload;
+    const {
+      type,
+      issuerDId,
+      issuerPassword,
+      receiverDId,
+      receiverPassword,
+      name,
+      context,
+    } = payload;
 
-    const credentialTypes = types.filter(type => CredentialMetadata[type]);
+    const viableCredentialType = CredentialOffer[type];
 
-    if (credentialTypes.length === 0)
-      throw new BadRequestException('The credential types are not supported');
+    if (!viableCredentialType)
+      throw new BadRequestException('No credential types are supported');
 
     const issuerAgent = await this.jolocomSDK.loadAgent(
       issuerPassword,
       issuerDId
     );
 
-    const credentialRequirements = credentialTypes.map(credType =>
-      generateRequirementsFromConfig({
-        metadata: CredentialMetadata[credType],
-        issuer: undefined, // add only platform verified issuers
-      })
-    );
-
-    const token = await issuerAgent.credRequestToken({
-      callbackURL: uniqueCallbackURL,
-      credentialRequirements,
+    const issuerToken = await issuerAgent.credOfferToken({
+      callbackURL: '',
+      offeredCredentials: [CredentialOffer[type]],
     });
 
-    const expiresOn = new Date();
-    expiresOn.setSeconds(900);
-    this.cacheManager.set<CredentialShareRequestDTO>(
-      token.nonce,
-      payload,
-      { ttl: 900 } // 15 mins
+    const receiverAgent = await this.jolocomSDK.loadAgent(
+      receiverPassword,
+      receiverDId
     );
 
-    return {
-      interactionId: token.nonce,
-      jwt: token.encode(),
-      expiresOn: expiresOn.getTime(),
-    };
-  }
+    const offerInteraction = await receiverAgent.processJWT(
+      issuerToken.encode()
+    );
+    const offerResponseToken =
+      await offerInteraction.createCredentialOfferResponseToken([{ type }]);
 
-  async storeSharedCredentials(
-    payload: StoreSharedCredentialsDTO
-  ): Promise<boolean> {
-    const ssiEnabled = this.configService.get(ConfigurationTypes.IDENTITY).ssi
-      .enabled;
-    if (!ssiEnabled) {
-      throw new NotEnabledException('SSI is not enabled', LogContext.SSI);
+    // catch up on tokens
+    await receiverAgent.processJWT(offerResponseToken.encode());
+    await issuerAgent.processJWT(issuerToken.encode());
+    const offerResponseInteraction = await issuerAgent.processJWT(
+      offerResponseToken.encode()
+    );
+
+    const state = offerResponseInteraction.getSummary()
+      .state as CredentialOfferFlowState;
+    const credentials = await offerResponseInteraction.issueSelectedCredentials(
+      state.selectedTypes.reduce((acc, val) => {
+        return {
+          ...acc,
+          [val]: () => {
+            const subjectObj: { subject?: string } = {
+              subject: offerResponseInteraction.participants.responder?.did,
+            };
+
+            const offer = {
+              ...subjectObj,
+              claim: {
+                message:
+                  `Demo ${val} for ` +
+                  offerResponseInteraction.participants.responder?.did,
+                name,
+                ...context,
+              },
+              metadata: CredentialMetadata[val],
+            };
+
+            return offer;
+          },
+        };
+      }, {})
+    );
+
+    const issuedCredentialsToken =
+      await offerResponseInteraction.createCredentialReceiveToken(credentials);
+
+    const receivedCredentialsInteraction = await receiverAgent.processJWT(
+      issuedCredentialsToken.encode()
+    );
+
+    const offerFlowState = receivedCredentialsInteraction.getSummary()
+      .state as CredentialOfferFlowState;
+
+    if (offerFlowState.credentialsAllValid) {
+      await receivedCredentialsInteraction.storeSelectedCredentials();
     }
-
-    const { offererDId, offererPassword, interactionId, jwt } = payload;
-
-    const request = await this.cacheManager.get<CredentialShareRequestDTO>(
-      interactionId
-    );
-
-    if (!request) {
-      throw new PreconditionFailedException(
-        `The interactionId could not be found: ${interactionId}`
-      );
-    }
-
-    const issuerAgent = await this.jolocomSDK.loadAgent(
-      request.issuerPassword,
-      request.issuerDId
-    );
-
-    const interaction = await issuerAgent.processJWT(jwt);
-    const credentials = await interaction.getVerifiableCredential();
-
-    const offererAgent = await this.jolocomSDK.loadAgent(
-      offererPassword,
-      offererDId
-    );
-
-    for (const credential of credentials) {
-      await offererAgent.storage.store.verifiableCredential(credential);
-    }
-
-    return true;
   }
 }

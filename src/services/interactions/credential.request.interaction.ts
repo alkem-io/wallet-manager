@@ -1,4 +1,4 @@
-export interface CredentialShareRequestDTO {
+export interface BeginCredentialRequestInteractionInputDTO {
   // The share request is going to be build using the agent of the issuer
   issuerDId: string;
   issuerPassword: string;
@@ -8,17 +8,13 @@ export interface CredentialShareRequestDTO {
   uniqueCallbackURL: string;
 }
 
-export interface CredentialShareResponseDTO {
+export interface BeginCredentialRequestInteractionOutputDTO {
   interactionId: string;
   jwt: string;
   expiresOn: number;
 }
 
-export interface StoreSharedCredentialsDTO {
-  // The offerer of the credentials
-  offererDId: string;
-  offererPassword: string;
-
+export interface CompleteCredentialRequestInteractionInputDTO {
   interactionId: string;
   // the token containing the credentials
   jwt: string;

@@ -1,12 +1,9 @@
-import { Module, CacheModule } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { SsiAgentService } from './ssi.agent.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature(undefined, 'jolocom'),
-    CacheModule.register(),
-  ],
+  imports: [TypeOrmModule.forFeature(undefined, 'jolocom')],
   providers: [SsiAgentService],
   exports: [SsiAgentService],
 })
