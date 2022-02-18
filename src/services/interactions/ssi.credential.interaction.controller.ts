@@ -18,15 +18,21 @@ import { SsiCredentialRequestInteractionService } from './ssi.credential.request
 import { Cache } from 'cache-manager';
 import { LogContext } from '@src/common/enums';
 import {
-  BeginCredentialRequestInteractionInputDTO as BeginCredentialRequestInteractionInput,
-  CompleteCredentialRequestInteractionInputDTO as CompleteCredentialRequestInteractionInput,
+  BeginCredentialRequestInteractionInput as BeginCredentialRequestInteractionInput,
+  CompleteCredentialRequestInteractionInput as CompleteCredentialRequestInteractionInput,
 } from './credential.request.interaction';
+import {
+  BeginCredentialOfferInteractionInput,
+  CompleteCredentialOfferInteractionInput,
+} from './credential.offer.interaction';
+import { SsiCredentialOfferInteractionService } from './ssi.credential.offer.interaction.service';
 
 @Controller()
 export class CredentialInteractionController {
   constructor(
     private ssiAgentService: SsiAgentService,
-    private credentialRequestInteractionService: SsiCredentialRequestInteractionService,
+    private requestInteractionService: SsiCredentialRequestInteractionService,
+    private offerInteractionService: SsiCredentialOfferInteractionService,
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: LoggerService,
     @Inject(CACHE_MANAGER)
@@ -51,7 +57,7 @@ export class CredentialInteractionController {
         data.issuerPassword
       );
       const beginCredentialRequestToken =
-        await this.credentialRequestInteractionService.beginCredentialRequestInteraction(
+        await this.requestInteractionService.beginCredentialRequestInteraction(
           agent,
           data.types,
           data.uniqueCallbackURL
@@ -74,8 +80,8 @@ export class CredentialInteractionController {
     }
   }
 
-  @MessagePattern({ cmd: 'completeCredentialShareInteraction' })
-  async completeCredentialShareInteraction(
+  @MessagePattern({ cmd: 'completeCredentialRequestInteraction' })
+  async completeCredentialRequestInteraction(
     @Payload() data: CompleteCredentialRequestInteractionInput,
     @Ctx() context: RmqContext
   ) {
@@ -104,7 +110,7 @@ export class CredentialInteractionController {
       );
 
       const interactionComplete =
-        await this.credentialRequestInteractionService.completeCredentialShareInteraction(
+        await this.requestInteractionService.completeCredentialShareInteraction(
           agent,
           data.jwt
         );
@@ -113,6 +119,99 @@ export class CredentialInteractionController {
       return interactionComplete;
     } catch (error) {
       const errorMessage = `Error when storing credentials: ${error}`;
+      this.logger.error(errorMessage, LogContext.SSI);
+      channel.ack(originalMsg);
+      throw new RpcException(errorMessage);
+    }
+  }
+
+  @MessagePattern({ cmd: 'beginCredentialOfferInteraction' })
+  async beginCredentialOfferInteraction(
+    @Payload() data: BeginCredentialOfferInteractionInput,
+    @Ctx() context: RmqContext
+  ) {
+    this.logger.verbose?.(
+      `beginCredentialOfferInteraction - payload: ${JSON.stringify(data)}`,
+      LogContext.EVENT
+    );
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+
+    try {
+      const agent = await this.ssiAgentService.loadAgent(
+        data.issuerDId,
+        data.issuerPassword
+      );
+      const beginCredentialOfferToken =
+        await this.offerInteractionService.beginCredentialOfferInteraction(
+          agent,
+          data.offeredCredentials.map(c => c.type),
+          data.uniqueCallbackURL
+        );
+
+      this.cacheManager.set<BeginCredentialOfferInteractionInput>(
+        beginCredentialOfferToken.interactionId,
+        data,
+        // time it so that it will expire at  the same time as the token
+        { ttl: beginCredentialOfferToken.expiresOn - new Date().getTime() }
+      );
+
+      channel.ack(originalMsg);
+      return beginCredentialOfferToken;
+    } catch (error) {
+      const errorMessage = `Error when creating offer credential: ${error}`;
+      this.logger.error(errorMessage, LogContext.SSI);
+      channel.ack(originalMsg);
+      throw new RpcException(errorMessage);
+    }
+  }
+
+  @MessagePattern({ cmd: 'completeCredentialOfferInteraction' })
+  async completeCredentialOfferInteraction(
+    @Payload() data: CompleteCredentialOfferInteractionInput,
+    @Ctx() context: RmqContext
+  ) {
+    this.logger.verbose?.(
+      `completeCredentialOfferInteraction - payload: ${JSON.stringify(data)}`,
+      LogContext.EVENT
+    );
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+
+    try {
+      const request =
+        await this.cacheManager.get<BeginCredentialOfferInteractionInput>(
+          data.interactionId
+        );
+
+      if (!request) {
+        throw new PreconditionFailedException(
+          `The interactionId could not be found: ${data.interactionId}`
+        );
+      }
+
+      const agent = await this.ssiAgentService.loadAgent(
+        request.issuerDId,
+        request.issuerPassword
+      );
+
+      const interactionComplete =
+        await this.offerInteractionService.completeCredentialOfferInteraction(
+          agent,
+          data.jwt,
+          request.offeredCredentials.reduce(
+            (aggr, cred) => ({
+              ...aggr,
+              [cred.type]: cred.claim,
+            }),
+            {}
+          )
+        );
+
+      channel.ack(originalMsg);
+      return interactionComplete;
+    } catch (error) {
+      const errorMessage = `Error when offering credentials: ${error}`;
       this.logger.error(errorMessage, LogContext.SSI);
       channel.ack(originalMsg);
       throw new RpcException(errorMessage);

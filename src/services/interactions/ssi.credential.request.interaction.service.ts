@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { ConfigurationTypes } from '@common/enums';
+import {
+  ConfigurationTypes,
+  CREDENTIAL_CONFIG_YML_ADAPTER,
+} from '@common/enums';
 import { LogContext } from '@common/enums/logging.context';
 import { Agent } from '@jolocom/sdk';
 import { CredentialRequestFlowState } from '@jolocom/sdk/js/interactionManager/types';
@@ -10,13 +13,16 @@ import {
   LoggerService,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { NotEnabledException } from '@src/common';
+import { NotEnabledException, NotSupportedException } from '@src/common';
+import { ICredentialConfigProvider } from '@src/core/contracts/credential.provider.interface';
 import { SignedCredential } from 'jolocom-lib/js/credentials/signedCredential/signedCredential';
 import { constraintFunctions } from 'jolocom-lib/js/interactionTokens/credentialRequest';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
-import { CredentialMetadata } from '../credentials';
-import { SystemCredentials } from '../credentials/recongized.credentials';
-import { BeginCredentialRequestInteractionOutputDTO } from '../interactions/credential.request.interaction';
+import {
+  CacheCredential,
+  SystemCredentials,
+} from '../credentials/system.credentials';
+import { BeginCredentialRequestInteractionOutput } from '../interactions/credential.request.interaction';
 
 export const generateRequirementsFromConfig = ({
   issuer,
@@ -34,31 +40,48 @@ export class SsiCredentialRequestInteractionService {
   constructor(
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: LoggerService,
-    private configService: ConfigService
+    private configService: ConfigService,
+    @Inject(CREDENTIAL_CONFIG_YML_ADAPTER)
+    private readonly credentialsProvider: ICredentialConfigProvider
   ) {}
 
   async beginCredentialRequestInteraction(
     agent: Agent,
     types: string[],
     uniqueCallbackURL: string
-  ): Promise<BeginCredentialRequestInteractionOutputDTO> {
+  ): Promise<BeginCredentialRequestInteractionOutput> {
     const ssiEnabled = this.configService.get(ConfigurationTypes.IDENTITY).ssi
       .enabled;
     if (!ssiEnabled) {
       throw new NotEnabledException('SSI is not enabled', LogContext.SSI);
     }
 
-    const credentialTypes = types.filter(type => CredentialMetadata[type]);
+    const credentialMetadata =
+      this.credentialsProvider.getCredentials().credentials;
+    const credentialTypes = types.filter(type =>
+      credentialMetadata.find(c => c.uniqueType !== type)
+    );
 
     if (credentialTypes.length === 0)
       throw new BadRequestException('The credential types are not supported');
 
-    const credentialRequirements = credentialTypes.map(credType =>
-      generateRequirementsFromConfig({
-        metadata: CredentialMetadata[credType],
+    const credentialRequirements = credentialTypes.map(credType => {
+      const metadata = credentialMetadata.find(c => c.uniqueType === credType);
+
+      if (!metadata) {
+        throw new NotSupportedException(
+          `Credential type not supported: ${credType}`,
+          LogContext.SSI
+        );
+      }
+
+      return generateRequirementsFromConfig({
+        metadata: {
+          type: metadata.types,
+        },
         issuer: undefined, // add only platform verified issuers
-      })
-    );
+      });
+    });
 
     const token = await agent.credRequestToken({
       callbackURL: uniqueCallbackURL,
@@ -109,24 +132,16 @@ export class SsiCredentialRequestInteractionService {
 
     for (const credential of verifiedCredentials) {
       const jsonCredential = credential.toJSON();
-      const credentialStringified = (await credential.asBytes()).toString(
-        'base64'
-      );
+      const serializedCredential = CacheCredential.encode(credential);
       const cacheCredential = await agent.credentials.issue({
         subject: agent.identityWallet.did,
         claim: {
-          claimSerialized: JSON.stringify(jsonCredential.claim),
-          base64Credential: credentialStringified,
+          ...serializedCredential,
         },
         metadata: {
           name: 'Cache credential',
           type: [SystemCredentials.CacheCredential, ...jsonCredential.type],
-          context: [
-            {
-              claimSerialized: 'schema:claim',
-              base64Credential: 'schema:string',
-            },
-          ],
+          context: [CacheCredential.context],
         },
       });
 

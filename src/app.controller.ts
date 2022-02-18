@@ -9,7 +9,6 @@ import {
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { LogContext } from './common';
 import { SsiAgentService } from './services/agent/ssi.agent.service';
-import { CredentialOfferDTO } from './services/interactions/credential.offer.interaction';
 
 @Controller()
 export class AppController {
@@ -66,30 +65,6 @@ export class AppController {
     }
   }
 
-  @MessagePattern({ cmd: 'grantCredential' })
-  async assignCredential(@Payload() data: any, @Ctx() context: RmqContext) {
-    this.logger.verbose?.(
-      `grantCredential - payload: ${JSON.stringify(data)}`,
-      LogContext.EVENT
-    );
-    const channel = context.getChannelRef();
-    const originalMsg = context.getMessage();
-
-    try {
-      const credentialGranted = await this.ssiAgentService.grantCredential(
-        data
-      );
-
-      channel.ack(originalMsg);
-      return credentialGranted;
-    } catch (error) {
-      const errorMessage = `Error when granting credential: ${error}`;
-      this.logger.error(errorMessage, LogContext.SSI);
-      channel.ack(originalMsg);
-      throw new RpcException(errorMessage);
-    }
-  }
-
   @MessagePattern({ cmd: 'grantStateTransitionVC' })
   async grantStateTransitionVC(
     @Payload() data: any,
@@ -117,32 +92,6 @@ export class AppController {
       return credentialGranted;
     } catch (error) {
       const errorMessage = `Error when granting credential: ${error}`;
-      this.logger.error(errorMessage, LogContext.SSI);
-      channel.ack(originalMsg);
-      throw new RpcException(errorMessage);
-    }
-  }
-
-  @MessagePattern({ cmd: 'issueVerifiedCredential' })
-  async issueVerifiedCredential(
-    @Payload() data: CredentialOfferDTO,
-    @Ctx() context: RmqContext
-  ) {
-    this.logger.verbose?.(
-      `issueVerifiedCredential - payload: ${JSON.stringify(data)}`,
-      LogContext.EVENT
-    );
-    const channel = context.getChannelRef();
-    const originalMsg = context.getMessage();
-
-    try {
-      const credentialGranted =
-        await this.ssiAgentService.issueVerifiedCredential(data);
-
-      channel.ack(originalMsg);
-      return credentialGranted;
-    } catch (error) {
-      const errorMessage = `Error when issuing credentials: ${error}`;
       this.logger.error(errorMessage, LogContext.SSI);
       channel.ack(originalMsg);
       throw new RpcException(errorMessage);

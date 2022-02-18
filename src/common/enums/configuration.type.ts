@@ -5,4 +5,5 @@ export enum ConfigurationTypes {
   ALKEMIO = 'alkemio',
   KRATOS = 'kratos',
   IDENTITY = 'identity',
+  CREDENTIALS = 'credentials',
 }

@@ -57,7 +57,7 @@ identity:
     # Note: NOT FOR PRODUCTION USAGE, experimental functionality,
     # In particular, the migrations of the Jolocom database are still not setup, so any DID's created are not
     # guaranteed to be migrated properly.
-    enabled: ${SSI_ENABLED}:false
+    enabled: ${SSI_ENABLED}:true
 
     jolocom:
       # MySQL database configuration for usage by the Jolocom SDK.
@@ -93,3 +93,39 @@ hosting:
   #
   # Options: Dev, Prod
   environment: ${ENVIRONMENT}:Dev
+
+credentials:
+  proof_of_name:
+    name: ${PROOF_OF_NAME_CREDENTIAL_NAME}:Proof of name credential
+    schema: ${PROOF_OF_NAME_CREDENTIAL_SCHEMA}:https://schema.org/EducationalOccupationalCredential
+    types:
+      - Credential
+      - ProofOfNameCredential
+    uniqueType: ProofOfNameCredential
+    context:
+      givenName: 'schema:givenName'
+      familyName: 'schema:familyName'
+  proof_of_postal_address:
+    name: ${PROOF_OF_POSTAL_ADDRESS_CREDENTIAL_NAME}:Proof of postal address credential
+    schema: ${PROOF_OF_POSTAL_ADDRESS_CREDENTIAL_SCHEMA}:https://schema.org/EducationalOccupationalCredential
+    types:
+      - Credential
+      - postalAddress
+    uniqueType: postalAddress
+    context:
+      addressLine1: 'schema:streetAddress'
+      addressLine2: 'schema:streetAddress'
+      postalCode: 'schema:postalCode'
+      city: 'schema:addressLocality'
+      country: 'schema:addressLocality'
+  proof_of_challenge_contributor:
+    name: Proof that the holder is Challenge Contributor
+    schema: https://schema.org/EducationalOccupationalCredential
+    types:
+      - Credential
+      - ChallengeContributorCredential
+    uniqueType: ChallengeContributorCredential
+    context:
+      challengeId: 'schema:uuid'
+      userId: 'schema:uuid'
+
