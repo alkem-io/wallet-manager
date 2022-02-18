@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { ConfigurationTypes } from '@common/enums';
+import {
+  ConfigurationTypes,
+  CREDENTIAL_CONFIG_YML_ADAPTER,
+} from '@common/enums';
 import { LogContext } from '@common/enums/logging.context';
 import { Agent, JolocomSDK } from '@jolocom/sdk';
 import { JolocomTypeormStorage } from '@jolocom/sdk-storage-typeorm';
@@ -9,6 +12,7 @@ import { Inject, Injectable, LoggerService } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectConnection } from '@nestjs/typeorm';
 import { NotEnabledException } from '@src/common';
+import { ICredentialConfigProvider } from '@src/core/contracts/credential.provider.interface';
 import { Agent as AlkemioAgent } from '@src/types/agent';
 import { VerifiedCredential } from '@src/types/verified.credential';
 import { constraintFunctions } from 'jolocom-lib/js/interactionTokens/credentialRequest';
@@ -35,6 +39,8 @@ export class SsiAgentService {
   constructor(
     @InjectConnection('jolocom')
     private typeormConnection: Connection,
+    @Inject(CREDENTIAL_CONFIG_YML_ADAPTER)
+    private readonly credentialsProvider: ICredentialConfigProvider,
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: LoggerService,
     private configService: ConfigService
@@ -59,6 +65,13 @@ export class SsiAgentService {
     return didDocAttrsJson;
   }
 
+  async getSupportedCredentialMetadata() {
+    const credentialsMetadata =
+      this.credentialsProvider.getCredentials().credentials;
+
+    return credentialsMetadata;
+  }
+
   async getVerifiedCredentials(
     did: string,
     password: string
@@ -67,13 +80,23 @@ export class SsiAgentService {
     const agent = await this.jolocomSDK.loadAgent(password, did);
     const query: CredentialQuery = {};
     const credentials = await agent.credentials.query(query);
+    const credentialsMetadata =
+      this.credentialsProvider.getCredentials().credentials;
     for (const credential of credentials) {
       const claim = credential.claim;
+      const metadata = credentialsMetadata.find(
+        c => credential.type.indexOf(c.uniqueType) !== -1
+      );
+      const context = metadata?.context || credential.context;
+      const name = credential.name; // metadata?.name
+
       let verifiedCredential: VerifiedCredential = {
         claim: JSON.stringify(claim),
         issuer: credential.issuer,
         type: credential.type[1],
         issued: credential.issued,
+        context: JSON.stringify(context),
+        name: name,
       };
 
       // TODO isolate logic in wrap/unwrap methods for CachedCredentials
@@ -87,6 +110,8 @@ export class SsiAgentService {
           issuer: signedCredential.issuer,
           type: signedCredential.type[signedCredential.type.length - 1],
           issued: signedCredential.issued,
+          context: JSON.stringify(context),
+          name: signedCredential.name,
         };
       }
 

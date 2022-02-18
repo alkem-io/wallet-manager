@@ -96,7 +96,7 @@ hosting:
 
 credentials:
   proof_of_name:
-    name: ${PROOF_OF_NAME_CREDENTIAL_NAME}:Proof of name credential
+    name: ${PROOF_OF_NAME_CREDENTIAL_NAME}:Name
     schema: ${PROOF_OF_NAME_CREDENTIAL_SCHEMA}:https://schema.org/EducationalOccupationalCredential
     types:
       - Credential
@@ -106,7 +106,7 @@ credentials:
       givenName: 'schema:givenName'
       familyName: 'schema:familyName'
   proof_of_postal_address:
-    name: ${PROOF_OF_POSTAL_ADDRESS_CREDENTIAL_NAME}:Proof of postal address credential
+    name: ${PROOF_OF_POSTAL_ADDRESS_CREDENTIAL_NAME}:Postal Address
     schema: ${PROOF_OF_POSTAL_ADDRESS_CREDENTIAL_SCHEMA}:https://schema.org/EducationalOccupationalCredential
     types:
       - Credential
@@ -119,7 +119,7 @@ credentials:
       city: 'schema:addressLocality'
       country: 'schema:addressLocality'
   proof_of_challenge_contributor:
-    name: Proof that the holder is Challenge Contributor
+    name: Challenge Contributor
     schema: https://schema.org/EducationalOccupationalCredential
     types:
       - Credential

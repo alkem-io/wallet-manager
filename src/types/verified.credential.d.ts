@@ -3,4 +3,6 @@ export type VerifiedCredential = {
   issuer: string;
   issued?: Date;
   claim: string;
+  name: string;
+  context?: string;
 };

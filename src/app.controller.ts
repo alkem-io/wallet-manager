@@ -97,4 +97,24 @@ export class AppController {
       throw new RpcException(errorMessage);
     }
   }
+
+  @MessagePattern({ cmd: 'getSupportedCredentialMetadata' })
+  async getSupportedCredentialMetadata(@Ctx() context: RmqContext) {
+    this.logger.verbose?.('getSupportedCredentialMetadata', LogContext.EVENT);
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+
+    try {
+      const credentialMetadata =
+        await this.ssiAgentService.getSupportedCredentialMetadata();
+
+      channel.ack(originalMsg);
+      return credentialMetadata;
+    } catch (error) {
+      const errorMessage = `Error when retrieving credential metadata: ${error}`;
+      this.logger.error(errorMessage, LogContext.SSI);
+      channel.ack(originalMsg);
+      throw new RpcException(errorMessage);
+    }
+  }
 }
