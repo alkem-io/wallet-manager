@@ -95,19 +95,33 @@ hosting:
   environment: ${ENVIRONMENT}:Dev
 
 credentials:
-  proof_of_name:
-    name: ${PROOF_OF_NAME_CREDENTIAL_NAME}:Name
-    schema: ${PROOF_OF_NAME_CREDENTIAL_SCHEMA}:https://schema.org/EducationalOccupationalCredential
+  proof_of_community_membership:
+    name: Community Member
+    description: The holder is a member of an Alkemio hub,challenge or opportunity community
+    schema: https://schema.org/EducationalOccupationalCredential
     types:
       - Credential
-      - ProofOfNameCredential
-    uniqueType: ProofOfNameCredential
+      - CommunityMemberCredential
+    uniqueType: CommunityMemberCredential
     context:
-      givenName: 'schema:givenName'
-      familyName: 'schema:familyName'
+      alkemioUser_userID: 'schema:uuid'
+      alkemioUser_email: 'schema:email'
+      communityMember_communityID: 'schema:uuid'
+  proof_of_alkemio_membership:
+    name: Alkemio User
+    description: The holder is a verified Alkemio user
+    schema: https://schema.org/EducationalOccupationalCredential
+    types:
+      - Credential
+      - AlkemioMemberCredential
+    uniqueType: AlkemioMemberCredential
+    context:
+      alkemioUser_userID: 'schema:uuid'
+      alkemioUser_email: 'schema:email'
   proof_of_postal_address:
-    name: ${PROOF_OF_POSTAL_ADDRESS_CREDENTIAL_NAME}:Postal Address
-    schema: ${PROOF_OF_POSTAL_ADDRESS_CREDENTIAL_SCHEMA}:https://schema.org/EducationalOccupationalCredential
+    name: Postal Address
+    description: The holder's location is confirmed by the issuer
+    schema: https://schema.org/EducationalOccupationalCredential
     types:
       - Credential
       - postalAddress
@@ -118,14 +132,3 @@ credentials:
       postalCode: 'schema:postalCode'
       city: 'schema:addressLocality'
       country: 'schema:addressLocality'
-  proof_of_challenge_contributor:
-    name: Challenge Contributor
-    schema: https://schema.org/EducationalOccupationalCredential
-    types:
-      - Credential
-      - ChallengeContributorCredential
-    uniqueType: ChallengeContributorCredential
-    context:
-      challengeId: 'schema:uuid'
-      userId: 'schema:uuid'
-

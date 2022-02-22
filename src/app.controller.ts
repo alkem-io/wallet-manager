@@ -9,6 +9,7 @@ import {
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { LogContext } from './common';
 import { SsiAgentService } from './services/agent/ssi.agent.service';
+import { CredentialMetadataOutput } from './services/credentials/credential.dto.metadata';
 
 @Controller()
 export class AppController {
@@ -100,13 +101,17 @@ export class AppController {
 
   @MessagePattern({ cmd: 'getSupportedCredentialMetadata' })
   async getSupportedCredentialMetadata(@Ctx() context: RmqContext) {
-    this.logger.verbose?.('getSupportedCredentialMetadata', LogContext.EVENT);
+    this.logger.verbose?.('getSupportedCredentialMetadata', LogContext.SSI);
     const channel = context.getChannelRef();
     const originalMsg = context.getMessage();
 
     try {
-      const credentialMetadata =
-        await this.ssiAgentService.getSupportedCredentialMetadata();
+      const credentialMetadata: CredentialMetadataOutput[] = (
+        await this.ssiAgentService.getSupportedCredentialMetadata()
+      ).map(cred => ({
+        ...cred,
+        context: JSON.stringify(cred.context),
+      }));
 
       channel.ack(originalMsg);
       return credentialMetadata;
