@@ -93,8 +93,9 @@ export class SsiAgentService {
       let verifiedCredential: VerifiedCredential = {
         claim: JSON.stringify(claim),
         issuer: credential.issuer,
-        type: credential.type[1],
+        type: credential.type[credential.type.length - 1],
         issued: credential.issued,
+        expires: credential.expires,
         context: JSON.stringify(context),
         name: name,
       };
@@ -110,6 +111,7 @@ export class SsiAgentService {
           issuer: signedCredential.issuer,
           type: signedCredential.type[signedCredential.type.length - 1],
           issued: signedCredential.issued,
+          expires: credential.expires,
           context: JSON.stringify(context),
           name: signedCredential.name,
         };
