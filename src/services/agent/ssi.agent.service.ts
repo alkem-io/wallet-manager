@@ -1,8 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import {
-  ConfigurationTypes,
-  CREDENTIAL_CONFIG_YML_ADAPTER,
-} from '@common/enums';
+import { ConfigurationTypes } from '@common/enums';
 import { LogContext } from '@common/enums/logging.context';
 import { Agent, JolocomSDK } from '@jolocom/sdk';
 import { JolocomTypeormStorage } from '@jolocom/sdk-storage-typeorm';
@@ -12,7 +9,6 @@ import { Inject, Injectable, LoggerService } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectConnection } from '@nestjs/typeorm';
 import { NotEnabledException } from '@src/common';
-import { ICredentialConfigProvider } from '@src/core/contracts/credential.provider.interface';
 import { Agent as AlkemioAgent } from '@src/types/agent';
 import { VerifiedCredential } from '@src/types/verified.credential';
 import { constraintFunctions } from 'jolocom-lib/js/interactionTokens/credentialRequest';
@@ -20,6 +16,7 @@ import { CredentialOfferRequestAttrs } from 'jolocom-lib/js/interactionTokens/ty
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Connection } from 'typeorm';
 import { CacheCredential, SystemCredentials } from '../credentials';
+import { CredentialMetadataInput } from '../credentials/credential.dto.metadata';
 
 export const generateRequirementsFromConfig = ({
   issuer,
@@ -39,8 +36,6 @@ export class SsiAgentService {
   constructor(
     @InjectConnection('jolocom')
     private typeormConnection: Connection,
-    @Inject(CREDENTIAL_CONFIG_YML_ADAPTER)
-    private readonly credentialsProvider: ICredentialConfigProvider,
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: LoggerService,
     private configService: ConfigService
@@ -65,26 +60,18 @@ export class SsiAgentService {
     return didDocAttrsJson;
   }
 
-  async getSupportedCredentialMetadata() {
-    const credentialsMetadata =
-      this.credentialsProvider.getCredentials().credentials;
-
-    return credentialsMetadata;
-  }
-
   async getVerifiedCredentials(
     did: string,
-    password: string
+    password: string,
+    credentialMetadata: CredentialMetadataInput[]
   ): Promise<VerifiedCredential[]> {
     const credentialsResult: VerifiedCredential[] = [];
     const agent = await this.jolocomSDK.loadAgent(password, did);
     const query: CredentialQuery = {};
     const credentials = await agent.credentials.query(query);
-    const credentialsMetadata =
-      this.credentialsProvider.getCredentials().credentials;
     for (const credential of credentials) {
       const claim = credential.claim;
-      const metadata = credentialsMetadata.find(
+      const metadata = credentialMetadata.find(
         c => credential.type.indexOf(c.uniqueType) !== -1
       );
       const context = metadata?.context || credential.context;

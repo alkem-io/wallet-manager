@@ -9,7 +9,6 @@ import {
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { LogContext } from './common';
 import { SsiAgentService } from './services/agent/ssi.agent.service';
-import { CredentialMetadataOutput } from './services/credentials/credential.dto.metadata';
 
 @Controller()
 export class AppController {
@@ -53,7 +52,8 @@ export class AppController {
     try {
       const identityInfo = await this.ssiAgentService.getVerifiedCredentials(
         data.did,
-        data.password
+        data.password,
+        data.credentialMetadata
       );
 
       channel.ack(originalMsg);
@@ -93,30 +93,6 @@ export class AppController {
       return credentialGranted;
     } catch (error) {
       const errorMessage = `Error when granting credential: ${error}`;
-      this.logger.error(errorMessage, LogContext.SSI);
-      channel.ack(originalMsg);
-      throw new RpcException(errorMessage);
-    }
-  }
-
-  @MessagePattern({ cmd: 'getSupportedCredentialMetadata' })
-  async getSupportedCredentialMetadata(@Ctx() context: RmqContext) {
-    this.logger.verbose?.('getSupportedCredentialMetadata', LogContext.SSI);
-    const channel = context.getChannelRef();
-    const originalMsg = context.getMessage();
-
-    try {
-      const credentialMetadata: CredentialMetadataOutput[] = (
-        await this.ssiAgentService.getSupportedCredentialMetadata()
-      ).map(cred => ({
-        ...cred,
-        context: JSON.stringify(cred.context),
-      }));
-
-      channel.ack(originalMsg);
-      return credentialMetadata;
-    } catch (error) {
-      const errorMessage = `Error when retrieving credential metadata: ${error}`;
       this.logger.error(errorMessage, LogContext.SSI);
       channel.ack(originalMsg);
       throw new RpcException(errorMessage);

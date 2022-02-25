@@ -59,7 +59,7 @@ export class CredentialInteractionController {
       const beginCredentialRequestToken =
         await this.requestInteractionService.beginCredentialRequestInteraction(
           agent,
-          data.types,
+          data.credentialMetadata,
           data.uniqueCallbackURL
         );
 
@@ -145,7 +145,7 @@ export class CredentialInteractionController {
       const beginCredentialOfferToken =
         await this.offerInteractionService.beginCredentialOfferInteraction(
           agent,
-          data.offeredCredentials.map(c => c.type),
+          data.offeredCredentials.map(c => c.metadata),
           data.uniqueCallbackURL
         );
 
@@ -199,10 +199,11 @@ export class CredentialInteractionController {
         await this.offerInteractionService.completeCredentialOfferInteraction(
           agent,
           data.jwt,
+          data.credentialMetadata,
           request.offeredCredentials.reduce(
             (aggr, cred) => ({
               ...aggr,
-              [cred.type]: cred.claim,
+              [cred.metadata.uniqueType]: cred.claim,
             }),
             {}
           )

@@ -1,8 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import {
-  ConfigurationTypes,
-  CREDENTIAL_CONFIG_YML_ADAPTER,
-} from '@common/enums';
+import { ConfigurationTypes } from '@common/enums';
 import { LogContext } from '@common/enums/logging.context';
 import { Agent } from '@jolocom/sdk';
 import { CredentialRequestFlowState } from '@jolocom/sdk/js/interactionManager/types';
@@ -14,10 +11,10 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NotEnabledException, NotSupportedException } from '@src/common';
-import { ICredentialConfigProvider } from '@src/core/contracts/credential.provider.interface';
 import { SignedCredential } from 'jolocom-lib/js/credentials/signedCredential/signedCredential';
 import { constraintFunctions } from 'jolocom-lib/js/interactionTokens/credentialRequest';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import { CredentialMetadataInput } from '../credentials/credential.dto.metadata';
 import {
   CacheCredential,
   SystemCredentials,
@@ -40,14 +37,12 @@ export class SsiCredentialRequestInteractionService {
   constructor(
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: LoggerService,
-    private configService: ConfigService,
-    @Inject(CREDENTIAL_CONFIG_YML_ADAPTER)
-    private readonly credentialsProvider: ICredentialConfigProvider
+    private configService: ConfigService
   ) {}
 
   async beginCredentialRequestInteraction(
     agent: Agent,
-    types: string[],
+    credentialMetadata: CredentialMetadataInput[],
     uniqueCallbackURL: string
   ): Promise<BeginCredentialRequestInteractionOutput> {
     const ssiEnabled = this.configService.get(ConfigurationTypes.IDENTITY).ssi
@@ -56,25 +51,7 @@ export class SsiCredentialRequestInteractionService {
       throw new NotEnabledException('SSI is not enabled', LogContext.SSI);
     }
 
-    const credentialMetadata =
-      this.credentialsProvider.getCredentials().credentials;
-    const credentialTypes = types.filter(type =>
-      credentialMetadata.find(c => c.uniqueType !== type)
-    );
-
-    if (credentialTypes.length === 0)
-      throw new BadRequestException('The credential types are not supported');
-
-    const credentialRequirements = credentialTypes.map(credType => {
-      const metadata = credentialMetadata.find(c => c.uniqueType === credType);
-
-      if (!metadata) {
-        throw new NotSupportedException(
-          `Credential type not supported: ${credType}`,
-          LogContext.SSI
-        );
-      }
-
+    const credentialRequirements = credentialMetadata.map(metadata => {
       return generateRequirementsFromConfig({
         metadata: {
           type: metadata.types,

@@ -4,7 +4,6 @@ import { APP_FILTER } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WinstonModule } from 'nest-winston';
 import { AppController } from './app.controller';
-import { CredentialConfigAdapterModule } from './application/credential-config-adapter/credential.config.adapter.module';
 import { ConfigurationTypes } from './common';
 import { WinstonConfigService } from './config';
 import configuration from './config/configuration';
@@ -51,7 +50,6 @@ import { SsiCredentialInteractionModule } from './services/interactions/ssi.cred
     }),
     SsiAgentModule,
     SsiCredentialInteractionModule,
-    CredentialConfigAdapterModule,
   ],
   providers: [
     {

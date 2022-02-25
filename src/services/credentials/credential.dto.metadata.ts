@@ -1,4 +1,4 @@
-export type CredentialMetadataOutput = {
+export type CredentialMetadataInput = {
   name: string;
   description: string;
   schema: string;

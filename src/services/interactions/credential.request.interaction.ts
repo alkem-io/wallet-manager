@@ -1,9 +1,11 @@
+import { CredentialMetadataInput } from '../credentials/credential.dto.metadata';
+
 export interface BeginCredentialRequestInteractionInput {
   // The share request is going to be build using the agent of the issuer
   issuerDId: string;
   issuerPassword: string;
   // The request needs to contain the credential types
-  types: string[];
+  credentialMetadata: CredentialMetadataInput[];
   // The callback URL that should receive the nonce + the offerer jwt
   uniqueCallbackURL: string;
 }

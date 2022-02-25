@@ -1,8 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import {
-  ConfigurationTypes,
-  CREDENTIAL_CONFIG_YML_ADAPTER,
-} from '@common/enums';
+import { ConfigurationTypes } from '@common/enums';
 import { LogContext } from '@common/enums/logging.context';
 import { Agent } from '@jolocom/sdk';
 import { CredentialOfferFlowState } from '@jolocom/sdk/js/interactionManager/types';
@@ -14,13 +11,10 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NotEnabledException } from '@src/common';
-import {
-  CredentialMetadata,
-  ICredentialConfigProvider,
-} from '@src/core/contracts/credential.provider.interface';
 import { constraintFunctions } from 'jolocom-lib/js/interactionTokens/credentialRequest';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { generateCredentialOffer } from '../credentials';
+import { CredentialMetadataInput } from '../credentials/credential.dto.metadata';
 import {
   BeginCredentialOfferInteractionOutput,
   CompleteCredentialOfferInteractionOutput,
@@ -42,14 +36,12 @@ export class SsiCredentialOfferInteractionService {
   constructor(
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: LoggerService,
-    private configService: ConfigService,
-    @Inject(CREDENTIAL_CONFIG_YML_ADAPTER)
-    private readonly credentialsProvider: ICredentialConfigProvider
+    private configService: ConfigService
   ) {}
 
   async beginCredentialOfferInteraction(
     agent: Agent,
-    types: string[],
+    credentialMetadata: CredentialMetadataInput[],
     uniqueCallbackURL: string
   ): Promise<BeginCredentialOfferInteractionOutput> {
     const ssiEnabled = this.configService.get(ConfigurationTypes.IDENTITY).ssi
@@ -58,18 +50,9 @@ export class SsiCredentialOfferInteractionService {
       throw new NotEnabledException('SSI is not enabled', LogContext.SSI);
     }
 
-    const credentialMetadata =
-      this.credentialsProvider.getCredentials().credentials;
-    const chosenCredentials = types
-      .map(type => credentialMetadata.find(cred => cred.uniqueType === type))
-      .filter(x => x) as CredentialMetadata[];
-
-    if (chosenCredentials.length === 0)
-      throw new BadRequestException('The credential types are not supported');
-
     const token = await agent.credOfferToken({
       callbackURL: uniqueCallbackURL,
-      offeredCredentials: chosenCredentials.map(cred =>
+      offeredCredentials: credentialMetadata.map(cred =>
         generateCredentialOffer(cred, agent.identityWallet.did)
       ),
     });
@@ -84,6 +67,7 @@ export class SsiCredentialOfferInteractionService {
   async completeCredentialOfferInteraction(
     agent: Agent,
     jwt: string,
+    credentialMetadata: CredentialMetadataInput[],
     claimMap: Record<string, any>
   ): Promise<CompleteCredentialOfferInteractionOutput> {
     const ssiEnabled = this.configService.get(ConfigurationTypes.IDENTITY).ssi
@@ -95,9 +79,6 @@ export class SsiCredentialOfferInteractionService {
     const interaction = await agent.processJWT(jwt);
     const credentialState = (await interaction.getSummary()
       .state) as CredentialOfferFlowState;
-
-    const credentialMetadata =
-      this.credentialsProvider.getCredentials().credentials;
 
     const selectedCredentials = credentialState.selectedTypes.reduce(
       (aggr, credType) => {
