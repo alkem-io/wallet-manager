@@ -57,7 +57,7 @@ identity:
     # Note: NOT FOR PRODUCTION USAGE, experimental functionality,
     # In particular, the migrations of the Jolocom database are still not setup, so any DID's created are not
     # guaranteed to be migrated properly.
-    enabled: ${SSI_ENABLED}:false
+    enabled: ${SSI_ENABLED}:true
 
     jolocom:
       # MySQL database configuration for usage by the Jolocom SDK.

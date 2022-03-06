@@ -9,6 +9,7 @@ import { WinstonConfigService } from './config';
 import configuration from './config/configuration';
 import { HttpExceptionsFilter } from './core';
 import { SsiAgentModule } from './services/agent/ssi.agent.module';
+import { SsiCredentialInteractionModule } from './services/interactions/ssi.credential.interaction.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { SsiAgentModule } from './services/agent/ssi.agent.module';
       }),
     }),
     SsiAgentModule,
+    SsiCredentialInteractionModule,
   ],
   providers: [
     {

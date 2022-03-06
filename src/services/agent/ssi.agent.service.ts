@@ -1,22 +1,33 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { Connection } from 'typeorm';
-import { Inject, Injectable, LoggerService } from '@nestjs/common';
-import { InjectConnection } from '@nestjs/typeorm';
-import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
-import { JolocomSDK } from '@jolocom/sdk';
-import { JolocomTypeormStorage } from '@jolocom/sdk-storage-typeorm';
-
-import { LogContext } from '@common/enums/logging.context';
-
-import stateModificationMetadata from '../credentials/state.modification.credential.metadata';
-import { ConfigService } from '@nestjs/config';
 import { ConfigurationTypes } from '@common/enums';
-import { NotEnabledException } from '@src/common';
-import { CredentialOfferRequestAttrs } from 'jolocom-lib/js/interactionTokens/types';
-import { CredentialQuery, IStorage } from '@jolocom/sdk/js/storage';
+import { LogContext } from '@common/enums/logging.context';
+import { Agent, JolocomSDK } from '@jolocom/sdk';
+import { JolocomTypeormStorage } from '@jolocom/sdk-storage-typeorm';
 import { CredentialOfferFlowState } from '@jolocom/sdk/js/interactionManager/types';
+import { CredentialQuery, IStorage } from '@jolocom/sdk/js/storage';
+import { Inject, Injectable, LoggerService } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { InjectConnection } from '@nestjs/typeorm';
+import { NotEnabledException } from '@src/common';
+import { Agent as AlkemioAgent } from '@src/types/agent';
 import { VerifiedCredential } from '@src/types/verified.credential';
-import { Agent } from '@src/types/agent';
+import { constraintFunctions } from 'jolocom-lib/js/interactionTokens/credentialRequest';
+import { CredentialOfferRequestAttrs } from 'jolocom-lib/js/interactionTokens/types';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import { Connection } from 'typeorm';
+import { CacheCredential, SystemCredentials } from '../credentials';
+import { CredentialMetadataInput } from '../credentials/credential.dto.metadata';
+
+export const generateRequirementsFromConfig = ({
+  issuer,
+  metadata,
+}: {
+  issuer?: string;
+  metadata: { type: string[] };
+}) => ({
+  type: metadata.type,
+  constraints: issuer ? [constraintFunctions.is('issuer', issuer)] : [],
+});
 
 @Injectable()
 export class SsiAgentService {
@@ -34,8 +45,12 @@ export class SsiAgentService {
   }
 
   async createAgent(password: string): Promise<string> {
-    const agent = await this.jolocomSDK.createAgent(password, 'jun');
+    const agent = await this.jolocomSDK.createAgent(password, 'jolo');
     return agent.identityWallet.did;
+  }
+
+  async loadAgent(did: string, password: string): Promise<Agent> {
+    return await this.jolocomSDK.loadAgent(password, did);
   }
 
   async loadDidDoc(did: string, password: string): Promise<string> {
@@ -47,7 +62,8 @@ export class SsiAgentService {
 
   async getVerifiedCredentials(
     did: string,
-    password: string
+    password: string,
+    credentialMetadata: CredentialMetadataInput[]
   ): Promise<VerifiedCredential[]> {
     const credentialsResult: VerifiedCredential[] = [];
     const agent = await this.jolocomSDK.loadAgent(password, did);
@@ -55,21 +71,49 @@ export class SsiAgentService {
     const credentials = await agent.credentials.query(query);
     for (const credential of credentials) {
       const claim = credential.claim;
-      const verifiedCredential: VerifiedCredential = {
+      const metadata = credentialMetadata.find(
+        c => credential.type.indexOf(c.uniqueType) !== -1
+      );
+      const context = metadata?.context || credential.context;
+      const name = credential.name; // metadata?.name
+
+      let verifiedCredential: VerifiedCredential = {
         claim: JSON.stringify(claim),
         issuer: credential.issuer,
-        type: credential.type[1],
+        type: credential.type[credential.type.length - 1],
         issued: credential.issued,
+        expires: credential.expires,
+        context: JSON.stringify(context),
+        name: name,
       };
+
+      // TODO isolate logic in wrap/unwrap methods for CachedCredentials
+      if (credential.type.indexOf(SystemCredentials.CacheCredential) !== -1) {
+        const signedCredential = CacheCredential.decode(
+          credential.claim as any
+        );
+
+        verifiedCredential = {
+          claim: JSON.stringify(signedCredential.claim),
+          issuer: signedCredential.issuer,
+          type: signedCredential.type[signedCredential.type.length - 1],
+          issued: signedCredential.issued,
+          expires: credential.expires,
+          context: JSON.stringify(context),
+          name: signedCredential.name,
+        };
+      }
+
       credentialsResult.push(verifiedCredential);
       this.logger.verbose?.(
-        `${JSON.stringify(credential.claim)}`,
+        `${JSON.stringify(verifiedCredential.claim)}`,
         LogContext.AUTH
       );
     }
     return credentialsResult;
   }
 
+  // TODO Clean this up
   async grantStateTransitionVC(
     issuerDid: string,
     issuerPW: string,
@@ -91,7 +135,7 @@ export class SsiAgentService {
       callbackURL: 'https://example.com/issuance',
       offeredCredentials: [
         {
-          type: 'StateModificationCredential',
+          type: 'TODO', //RecognizedCredentials.StateModificationCredential,
         },
       ],
     };
@@ -105,7 +149,7 @@ export class SsiAgentService {
     // Receiver then creates a response token
     const receiverCredExchangeResponse =
       await receiverCredExchangeInteraction.createCredentialOfferResponseToken([
-        { type: 'StateModificationCredential' },
+        { type: 'RecognizedCredentials.StateModificationCredential' },
       ]);
 
     // Note that all agents need to also process the tokens they generate so that their interaction manager has seen all messages
@@ -118,7 +162,10 @@ export class SsiAgentService {
 
     // Create the VC that then will be issued by Alice to Bob, so that Bob can then prove that Alice attested to this credential about him.
     const issuerAboutReceiverVC = await issuerAgent.signedCredential({
-      metadata: stateModificationMetadata,
+      metadata: {
+        name: 'TODO',
+        type: ['TODO'],
+      },
       subject: receiverAgent.identityWallet.did,
       claim: {
         challengeID: challengeID,
@@ -150,9 +197,9 @@ export class SsiAgentService {
   }
 
   async authorizeStateModification(
-    issuingAgent: Agent,
+    issuingAgent: AlkemioAgent,
     issuingResourceID: string,
-    receivingAgent: Agent,
+    receivingAgent: AlkemioAgent,
     receivingResourceID: string
   ): Promise<boolean> {
     const ssiEnabled = this.configService.get(ConfigurationTypes.IDENTITY).ssi
@@ -170,9 +217,5 @@ export class SsiAgentService {
       receivingResourceID
     );
     return true;
-  }
-
-  async grantCredential(payload: any): Promise<boolean> {
-    return false;
   }
 }

@@ -52,37 +52,14 @@ export class AppController {
     try {
       const identityInfo = await this.ssiAgentService.getVerifiedCredentials(
         data.did,
-        data.password
+        data.password,
+        data.credentialMetadata
       );
 
       channel.ack(originalMsg);
       return identityInfo;
     } catch (error) {
       const errorMessage = `Error when acquiring DID: ${error}`;
-      this.logger.error(errorMessage, LogContext.SSI);
-      channel.ack(originalMsg);
-      throw new RpcException(errorMessage);
-    }
-  }
-
-  @MessagePattern({ cmd: 'grantCredential' })
-  async assignCredential(@Payload() data: any, @Ctx() context: RmqContext) {
-    this.logger.verbose?.(
-      `grantCredential - payload: ${JSON.stringify(data)}`,
-      LogContext.EVENT
-    );
-    const channel = context.getChannelRef();
-    const originalMsg = context.getMessage();
-
-    try {
-      const credentialGranted = await this.ssiAgentService.grantCredential(
-        data
-      );
-
-      channel.ack(originalMsg);
-      return credentialGranted;
-    } catch (error) {
-      const errorMessage = `Error when granting credential: ${error}`;
       this.logger.error(errorMessage, LogContext.SSI);
       channel.ack(originalMsg);
       throw new RpcException(errorMessage);
