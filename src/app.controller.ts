@@ -52,7 +52,8 @@ export class AppController {
     try {
       const identityInfo = await this.ssiAgentService.getVerifiedCredentials(
         data.did,
-        data.password
+        data.password,
+        data.credentialMetadata
       );
 
       channel.ack(originalMsg);
@@ -65,19 +66,28 @@ export class AppController {
     }
   }
 
-  @MessagePattern({ cmd: 'grantCredential' })
-  async assignCredential(@Payload() data: any, @Ctx() context: RmqContext) {
+  @MessagePattern({ cmd: 'grantStateTransitionVC' })
+  async grantStateTransitionVC(
+    @Payload() data: any,
+    @Ctx() context: RmqContext
+  ) {
     this.logger.verbose?.(
-      `grantCredential - payload: ${JSON.stringify(data)}`,
+      `grantStateTransitionVC - payload: ${JSON.stringify(data)}`,
       LogContext.EVENT
     );
     const channel = context.getChannelRef();
     const originalMsg = context.getMessage();
 
     try {
-      const credentialGranted = await this.ssiAgentService.grantCredential(
-        data
-      );
+      const credentialGranted =
+        await this.ssiAgentService.grantStateTransitionVC(
+          data.issuerDid,
+          data.issuerPW,
+          data.receiverDid,
+          data.receiverPw,
+          data.challengeID,
+          data.userID
+        );
 
       channel.ack(originalMsg);
       return credentialGranted;
