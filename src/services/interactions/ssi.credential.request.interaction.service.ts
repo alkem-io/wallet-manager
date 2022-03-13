@@ -45,12 +45,6 @@ export class SsiCredentialRequestInteractionService {
     credentialMetadata: CredentialMetadataInput[],
     uniqueCallbackURL: string
   ): Promise<BeginCredentialRequestInteractionOutput> {
-    const ssiEnabled = this.configService.get(ConfigurationTypes.IDENTITY).ssi
-      .enabled;
-    if (!ssiEnabled) {
-      throw new NotEnabledException('SSI is not enabled', LogContext.SSI);
-    }
-
     const credentialRequirements = credentialMetadata.map(metadata => {
       return generateRequirementsFromConfig({
         metadata: {
@@ -76,12 +70,6 @@ export class SsiCredentialRequestInteractionService {
     agent: Agent,
     jwt: string
   ): Promise<boolean> {
-    const ssiEnabled = this.configService.get(ConfigurationTypes.IDENTITY).ssi
-      .enabled;
-    if (!ssiEnabled) {
-      throw new NotEnabledException('SSI is not enabled', LogContext.SSI);
-    }
-
     const interaction = await agent.processJWT(jwt);
     const credentialState = (await interaction.getSummary()
       .state) as CredentialRequestFlowState;

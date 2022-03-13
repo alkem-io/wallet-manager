@@ -44,12 +44,6 @@ export class SsiCredentialOfferInteractionService {
     credentialMetadata: CredentialMetadataInput[],
     uniqueCallbackURL: string
   ): Promise<BeginCredentialOfferInteractionOutput> {
-    const ssiEnabled = this.configService.get(ConfigurationTypes.IDENTITY).ssi
-      .enabled;
-    if (!ssiEnabled) {
-      throw new NotEnabledException('SSI is not enabled', LogContext.SSI);
-    }
-
     const token = await agent.credOfferToken({
       callbackURL: uniqueCallbackURL,
       offeredCredentials: credentialMetadata.map(cred =>
@@ -70,12 +64,6 @@ export class SsiCredentialOfferInteractionService {
     credentialMetadata: CredentialMetadataInput[],
     claimMap: Record<string, any>
   ): Promise<CompleteCredentialOfferInteractionOutput> {
-    const ssiEnabled = this.configService.get(ConfigurationTypes.IDENTITY).ssi
-      .enabled;
-    if (!ssiEnabled) {
-      throw new NotEnabledException('SSI is not enabled', LogContext.SSI);
-    }
-
     const interaction = await agent.processJWT(jwt);
     const credentialState = (await interaction.getSummary()
       .state) as CredentialOfferFlowState;
