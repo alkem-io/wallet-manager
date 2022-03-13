@@ -23,9 +23,12 @@ import {
 } from './credential.request.interaction';
 import {
   BeginCredentialOfferInteractionInput,
+  BeginCredentialOfferInteractionOutput,
   CompleteCredentialOfferInteractionInput,
+  CompleteCredentialOfferInteractionOutput,
 } from './credential.offer.interaction';
 import { SsiCredentialOfferInteractionService } from './ssi.credential.offer.interaction.service';
+import jwt_decode from 'jwt-decode';
 
 @Controller()
 export class CredentialInteractionController {
@@ -84,7 +87,7 @@ export class CredentialInteractionController {
   async completeCredentialRequestInteraction(
     @Payload() data: CompleteCredentialRequestInteractionInput,
     @Ctx() context: RmqContext
-  ) {
+  ): Promise<boolean> {
     this.logger.verbose?.(
       `completeCredentialShareInteraction - payload: ${JSON.stringify(data)}`,
       LogContext.EVENT
@@ -129,7 +132,7 @@ export class CredentialInteractionController {
   async beginCredentialOfferInteraction(
     @Payload() data: BeginCredentialOfferInteractionInput,
     @Ctx() context: RmqContext
-  ) {
+  ): Promise<BeginCredentialOfferInteractionOutput> {
     this.logger.verbose?.(
       `beginCredentialOfferInteraction - payload: ${JSON.stringify(data)}`,
       LogContext.EVENT
@@ -142,7 +145,7 @@ export class CredentialInteractionController {
         data.issuerDId,
         data.issuerPassword
       );
-      const beginCredentialOfferToken =
+      const beginCredentialOfferOutput =
         await this.offerInteractionService.beginCredentialOfferInteraction(
           agent,
           data.offeredCredentials.map(c => c.metadata),
@@ -150,14 +153,18 @@ export class CredentialInteractionController {
         );
 
       this.cacheManager.set<BeginCredentialOfferInteractionInput>(
-        beginCredentialOfferToken.interactionId,
+        beginCredentialOfferOutput.interactionId,
         data,
         // time it so that it will expire at  the same time as the token
-        { ttl: beginCredentialOfferToken.expiresOn - new Date().getTime() }
+        { ttl: beginCredentialOfferOutput.expiresOn - new Date().getTime() }
       );
 
       channel.ack(originalMsg);
-      return beginCredentialOfferToken;
+      this.logVerifiedCredentialInteraction(
+        beginCredentialOfferOutput.jwt,
+        'begin'
+      );
+      return beginCredentialOfferOutput;
     } catch (error) {
       const errorMessage = `Error when creating offer credential: ${error}`;
       this.logger.error(errorMessage, LogContext.SSI);
@@ -170,7 +177,7 @@ export class CredentialInteractionController {
   async completeCredentialOfferInteraction(
     @Payload() data: CompleteCredentialOfferInteractionInput,
     @Ctx() context: RmqContext
-  ) {
+  ): Promise<CompleteCredentialOfferInteractionOutput> {
     this.logger.verbose?.(
       `completeCredentialOfferInteraction - payload: ${JSON.stringify(data)}`,
       LogContext.EVENT
@@ -210,6 +217,10 @@ export class CredentialInteractionController {
         );
 
       channel.ack(originalMsg);
+      this.logVerifiedCredentialInteraction(
+        interactionComplete.token,
+        'CredOfferInteractionComplete'
+      );
       return interactionComplete;
     } catch (error) {
       const errorMessage = `Error when offering credentials: ${error}`;
@@ -217,5 +228,13 @@ export class CredentialInteractionController {
       channel.ack(originalMsg);
       throw new RpcException(errorMessage);
     }
+  }
+
+  private logVerifiedCredentialInteraction(jwt: string, prefix: string) {
+    const tokenJson = jwt_decode(jwt);
+    this.logger.verbose?.(
+      `[${prefix}] - Token converted to JSON: ${JSON.stringify(tokenJson)}`,
+      LogContext.SSI
+    );
   }
 }

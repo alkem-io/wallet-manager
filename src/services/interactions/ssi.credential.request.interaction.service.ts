@@ -1,16 +1,7 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { ConfigurationTypes } from '@common/enums';
 import { LogContext } from '@common/enums/logging.context';
 import { Agent } from '@jolocom/sdk';
 import { CredentialRequestFlowState } from '@jolocom/sdk/js/interactionManager/types';
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  LoggerService,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { NotEnabledException, NotSupportedException } from '@src/common';
+import { Inject, Injectable, LoggerService } from '@nestjs/common';
 import { SignedCredential } from 'jolocom-lib/js/credentials/signedCredential/signedCredential';
 import { constraintFunctions } from 'jolocom-lib/js/interactionTokens/credentialRequest';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
@@ -36,8 +27,7 @@ export const generateRequirementsFromConfig = ({
 export class SsiCredentialRequestInteractionService {
   constructor(
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
-    private readonly logger: LoggerService,
-    private configService: ConfigService
+    private readonly logger: LoggerService
   ) {}
 
   async beginCredentialRequestInteraction(

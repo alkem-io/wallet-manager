@@ -57,7 +57,7 @@ monitoring:
 # guaranteed to be migrated properly.
 jolocom:
     # The did method to use. Options are: jun, jolo. Latter is slow...
-  method: ${DID_METHOD}:jun
+  method: ${DID_METHOD}:jolo
 
   # MySQL database configuration for usage by the Jolocom SDK.
   # The authentication method used is MySQL Native Password.
