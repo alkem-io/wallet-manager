@@ -96,28 +96,35 @@ export class SsiAgentService {
         name: name,
       };
 
-      // TODO isolate logic in wrap/unwrap methods for CachedCredentials
-      if (credential.type.indexOf(SystemCredentials.CacheCredential) !== -1) {
-        const signedCredential = CacheCredential.decode(
-          credential.claim as any
+      try {
+        // TODO isolate logic in wrap/unwrap methods for CachedCredentials
+        if (credential.type.indexOf(SystemCredentials.CacheCredential) !== -1) {
+          const signedCredential = CacheCredential.decode(
+            credential.claim as any
+          );
+
+          verifiedCredential = {
+            claim: JSON.stringify(signedCredential.claim),
+            issuer: signedCredential.issuer,
+            type: signedCredential.type[signedCredential.type.length - 1],
+            issued: signedCredential.issued,
+            expires: credential.expires,
+            context: JSON.stringify(context),
+            name: signedCredential.name,
+          };
+        }
+
+        credentialsResult.push(verifiedCredential);
+        this.logger.verbose?.(
+          `${JSON.stringify(verifiedCredential.claim)}`,
+          LogContext.AUTH
         );
-
-        verifiedCredential = {
-          claim: JSON.stringify(signedCredential.claim),
-          issuer: signedCredential.issuer,
-          type: signedCredential.type[signedCredential.type.length - 1],
-          issued: signedCredential.issued,
-          expires: credential.expires,
-          context: JSON.stringify(context),
-          name: signedCredential.name,
-        };
+      } catch (error) {
+        this.logger.error(
+          `Unable to retrieve credential '${credential.type}': ${error}`,
+          LogContext.SSI
+        );
       }
-
-      credentialsResult.push(verifiedCredential);
-      this.logger.verbose?.(
-        `${JSON.stringify(verifiedCredential.claim)}`,
-        LogContext.AUTH
-      );
     }
     return credentialsResult;
   }
