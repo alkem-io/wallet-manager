@@ -28,7 +28,7 @@ import { SsiCredentialInteractionModule } from './services/interactions/ssi.cred
       useFactory: async (configService: ConfigService) => ({
         type: 'mysql',
         insecureAuth: true,
-        synchronize: true /*toDo - move to migrations */,
+        synchronize: false,
         cache: true,
         entities: [
           'node_modules/@jolocom/sdk-storage-typeorm/js/src/entities/*.js',
