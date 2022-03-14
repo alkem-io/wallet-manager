@@ -1,16 +1,7 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { ConfigurationTypes } from '@common/enums';
-import { LogContext } from '@common/enums/logging.context';
+import { CredentialOfferRequestAttrs } from '@jolocom/protocol-ts/dist/lib/interactionTokens';
 import { Agent } from '@jolocom/sdk';
 import { CredentialOfferFlowState } from '@jolocom/sdk/js/interactionManager/types';
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  LoggerService,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { NotEnabledException } from '@src/common';
+import { Inject, Injectable, LoggerService } from '@nestjs/common';
 import { constraintFunctions } from 'jolocom-lib/js/interactionTokens/credentialRequest';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { generateCredentialOffer } from '../credentials';
@@ -35,27 +26,21 @@ export const generateRequirementsFromConfig = ({
 export class SsiCredentialOfferInteractionService {
   constructor(
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
-    private readonly logger: LoggerService,
-    private configService: ConfigService
+    private readonly logger: LoggerService
   ) {}
 
   async beginCredentialOfferInteraction(
-    agent: Agent,
+    jolocomAgent: Agent,
     credentialMetadata: CredentialMetadataInput[],
     uniqueCallbackURL: string
   ): Promise<BeginCredentialOfferInteractionOutput> {
-    const ssiEnabled = this.configService.get(ConfigurationTypes.IDENTITY).ssi
-      .enabled;
-    if (!ssiEnabled) {
-      throw new NotEnabledException('SSI is not enabled', LogContext.SSI);
-    }
-
-    const token = await agent.credOfferToken({
+    const offerParameters: CredentialOfferRequestAttrs = {
       callbackURL: uniqueCallbackURL,
       offeredCredentials: credentialMetadata.map(cred =>
-        generateCredentialOffer(cred, agent.identityWallet.did)
+        generateCredentialOffer(cred, jolocomAgent.identityWallet.did)
       ),
-    });
+    };
+    const token = await jolocomAgent.credOfferToken(offerParameters);
 
     return {
       interactionId: token.nonce,
@@ -70,12 +55,6 @@ export class SsiCredentialOfferInteractionService {
     credentialMetadata: CredentialMetadataInput[],
     claimMap: Record<string, any>
   ): Promise<CompleteCredentialOfferInteractionOutput> {
-    const ssiEnabled = this.configService.get(ConfigurationTypes.IDENTITY).ssi
-      .enabled;
-    if (!ssiEnabled) {
-      throw new NotEnabledException('SSI is not enabled', LogContext.SSI);
-    }
-
     const interaction = await agent.processJWT(jwt);
     const credentialState = (await interaction.getSummary()
       .state) as CredentialOfferFlowState;

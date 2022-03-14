@@ -8,10 +8,10 @@ rabbitmq:
     port: ${RABBITMQ_PORT}:5672
 
     # RabbitMQ user
-    user: ${RABBITMQ_USER}:user
+    user: ${RABBITMQ_USER}:alkemio-admin
 
     # RabbitMQ password
-    password: ${RABBITMQ_PASSWORD}:bitnami
+    password: ${RABBITMQ_PASSWORD}:alkemio!
 
 ## MONITORING ##
 # This section defines settings used for DevOps - MONITORING providers, endpoints, logging configuration.
@@ -51,39 +51,39 @@ monitoring:
       # Elastic Cloud password.
       password: ${ELASTIC_CLOUD_PASSWORD}
 
-identity:
-  ssi:
-    # Jolocom SDK is used for providing SSI capabilities on the platform.
-    # Note: NOT FOR PRODUCTION USAGE, experimental functionality,
-    # In particular, the migrations of the Jolocom database are still not setup, so any DID's created are not
-    # guaranteed to be migrated properly.
-    enabled: ${SSI_ENABLED}:true
+# Jolocom SDK is used for providing SSI capabilities on the platform.
+# Note: NOT FOR PRODUCTION USAGE, experimental functionality,
+# In particular, the migrations of the Jolocom database are still not setup, so any DID's created are not
+# guaranteed to be migrated properly.
+jolocom:
+    # The did method to use. Options are: jun, jolo. Latter is slow...
+  method: ${DID_METHOD}:jolo
 
-    jolocom:
-      # MySQL database configuration for usage by the Jolocom SDK.
-      # The authentication method used is MySQL Native Password.
-      # Note: both schema / database name are used for configuration and they need to have the same value.
-      database:
-        # Database host.
-        host: ${DATABASE_HOST}:localhost
+  # MySQL database configuration for usage by the Jolocom SDK.
+  # The authentication method used is MySQL Native Password.
+  # Note: both schema / database name are used for configuration and they need to have the same value.
+  database:
+    # Database host.
+    host: ${DATABASE_HOST}:localhost
 
-        # MySQL daemon port.
-        port: 3306
+    # MySQL daemon port.
+    port: 3306
 
-        # MySQL username.
-        username: 'root'
+    # MySQL username.
+    username: 'root'
 
-        # MySQL password.
-        password: ${MYSQL_ROOT_PASSWORD}:toor
+    # MySQL password.
+    password: ${MYSQL_ROOT_PASSWORD}:toor
 
-        # MySQL schema / database name.
-        schema: ${JOLOCOM_MYSQL_DATABASE}:jolocom
+    # MySQL schema / database name.
+    schema: ${JOLOCOM_MYSQL_DATABASE}:jolocom
 
-        # MySQL schema / database name.
-        database: ${JOLOCOM_MYSQL_DATABASE}:jolocom
+    # MySQL schema / database name.
+    database: ${JOLOCOM_MYSQL_DATABASE}:jolocom
 
-        # Flag setting whether MySQL operations should be logged to the console.
-        logging: ${JOLOCOM_ENABLE_ORM_LOGGING}:false
+    # Flag setting whether MySQL operations should be logged to the console.
+    logging: ${JOLOCOM_ENABLE_ORM_LOGGING}:false
+
 ## hosting ##
 # The hosting configuration for the Alkemio Server
 hosting:

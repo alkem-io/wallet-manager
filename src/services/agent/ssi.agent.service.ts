@@ -8,7 +8,7 @@ import { CredentialQuery, IStorage } from '@jolocom/sdk/js/storage';
 import { Inject, Injectable, LoggerService } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectConnection } from '@nestjs/typeorm';
-import { NotEnabledException } from '@src/common';
+import { NotSupportedException } from '@src/common/exceptions/not.supported.exception';
 import { Agent as AlkemioAgent } from '@src/types/agent';
 import { VerifiedCredential } from '@src/types/verified.credential';
 import { constraintFunctions } from 'jolocom-lib/js/interactionTokens/credentialRequest';
@@ -32,6 +32,8 @@ export const generateRequirementsFromConfig = ({
 @Injectable()
 export class SsiAgentService {
   private jolocomSDK: JolocomSDK;
+  private didMethod: string;
+  private allowedDidMethods = ['jolo', 'jun'];
 
   constructor(
     @InjectConnection('jolocom')
@@ -42,10 +44,17 @@ export class SsiAgentService {
   ) {
     const storage: IStorage = new JolocomTypeormStorage(this.typeormConnection);
     this.jolocomSDK = new JolocomSDK({ storage });
+
+    this.didMethod = this.configService.get(ConfigurationTypes.JOLOCOM).method;
+    if (!this.allowedDidMethods.includes(this.didMethod))
+      throw new NotSupportedException(
+        `Invalid did method type encountered: ${this.didMethod}`,
+        LogContext.SSI
+      );
   }
 
   async createAgent(password: string): Promise<string> {
-    const agent = await this.jolocomSDK.createAgent(password, 'jolo');
+    const agent = await this.jolocomSDK.createAgent(password, this.didMethod);
     return agent.identityWallet.did;
   }
 
@@ -87,28 +96,35 @@ export class SsiAgentService {
         name: name,
       };
 
-      // TODO isolate logic in wrap/unwrap methods for CachedCredentials
-      if (credential.type.indexOf(SystemCredentials.CacheCredential) !== -1) {
-        const signedCredential = CacheCredential.decode(
-          credential.claim as any
+      try {
+        // TODO isolate logic in wrap/unwrap methods for CachedCredentials
+        if (credential.type.indexOf(SystemCredentials.CacheCredential) !== -1) {
+          const signedCredential = CacheCredential.decode(
+            credential.claim as any
+          );
+
+          verifiedCredential = {
+            claim: JSON.stringify(signedCredential.claim),
+            issuer: signedCredential.issuer,
+            type: signedCredential.type[signedCredential.type.length - 1],
+            issued: signedCredential.issued,
+            expires: credential.expires,
+            context: JSON.stringify(context),
+            name: signedCredential.name,
+          };
+        }
+
+        credentialsResult.push(verifiedCredential);
+        this.logger.verbose?.(
+          `${JSON.stringify(verifiedCredential.claim)}`,
+          LogContext.AUTH
         );
-
-        verifiedCredential = {
-          claim: JSON.stringify(signedCredential.claim),
-          issuer: signedCredential.issuer,
-          type: signedCredential.type[signedCredential.type.length - 1],
-          issued: signedCredential.issued,
-          expires: credential.expires,
-          context: JSON.stringify(context),
-          name: signedCredential.name,
-        };
+      } catch (error) {
+        this.logger.error(
+          `Unable to retrieve credential '${credential.type}': ${error}`,
+          LogContext.SSI
+        );
       }
-
-      credentialsResult.push(verifiedCredential);
-      this.logger.verbose?.(
-        `${JSON.stringify(verifiedCredential.claim)}`,
-        LogContext.AUTH
-      );
     }
     return credentialsResult;
   }
@@ -202,12 +218,6 @@ export class SsiAgentService {
     receivingAgent: AlkemioAgent,
     receivingResourceID: string
   ): Promise<boolean> {
-    const ssiEnabled = this.configService.get(ConfigurationTypes.IDENTITY).ssi
-      .enabled;
-    if (!ssiEnabled) {
-      throw new NotEnabledException('SSI is not enabled', LogContext.SSI);
-    }
-
     await this.grantStateTransitionVC(
       issuingAgent.did,
       issuingAgent.password,

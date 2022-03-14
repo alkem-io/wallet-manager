@@ -28,24 +28,22 @@ import { SsiCredentialInteractionModule } from './services/interactions/ssi.cred
       useFactory: async (configService: ConfigService) => ({
         type: 'mysql',
         insecureAuth: true,
-        synchronize: true /*toDo - move to migrations */,
+        synchronize: false,
         cache: true,
         entities: [
           'node_modules/@jolocom/sdk-storage-typeorm/js/src/entities/*.js',
         ],
-        host: configService.get(ConfigurationTypes.IDENTITY)?.ssi.jolocom
-          .database?.host,
-        port: configService.get(ConfigurationTypes.IDENTITY)?.ssi.jolocom
-          .database?.port,
-        username: configService.get(ConfigurationTypes.IDENTITY)?.ssi.jolocom
-          .database?.username,
-        password: configService.get(ConfigurationTypes.IDENTITY)?.ssi.jolocom
-          .database?.password,
-        database: configService.get(ConfigurationTypes.IDENTITY)?.ssi.jolocom
-          .database?.schema,
+        host: configService.get(ConfigurationTypes.JOLOCOM)?.database?.host,
+        port: configService.get(ConfigurationTypes.JOLOCOM)?.database?.port,
+        username: configService.get(ConfigurationTypes.JOLOCOM)?.database
+          ?.username,
+        password: configService.get(ConfigurationTypes.JOLOCOM)?.database
+          ?.password,
+        database: configService.get(ConfigurationTypes.JOLOCOM)?.database
+          ?.schema,
 
-        logging: configService.get(ConfigurationTypes.IDENTITY)?.ssi.jolocom
-          .database?.logging,
+        logging: configService.get(ConfigurationTypes.JOLOCOM)?.database
+          ?.logging,
       }),
     }),
     SsiAgentModule,

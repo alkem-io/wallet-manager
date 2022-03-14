@@ -1,4 +1,6 @@
 import { ISignedCredentialAttrs } from '@jolocom/protocol-ts';
+import { NotSupportedException } from '@src/common';
+import { LogContext } from '@src/common/enums';
 import { SignedCredential } from 'jolocom-lib/js/credentials/signedCredential/signedCredential';
 
 export enum SystemCredentials {
@@ -56,8 +58,10 @@ export class CacheCredential {
     };
 
     if (cacheCredential.encodedClaim.length > 255) {
-      console.warn('the encodedClaim is longer than 255');
-      cacheCredential.encodedClaim = '';
+      throw new NotSupportedException(
+        `Unable to store credential: the encodedClaim is longer than 255 - ${cacheCredential.encodedClaim}`,
+        LogContext.SSI
+      );
     }
 
     return cacheCredential;
