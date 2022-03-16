@@ -6,7 +6,6 @@ import { SignedCredential } from 'jolocom-lib/js/credentials/signedCredential/si
 export enum SystemCredentials {
   CacheCredential = 'CacheCredential',
 }
-
 type CacheCredentialContract = {
   id: string;
   issued: string;
@@ -24,6 +23,8 @@ type CacheCredentialContract = {
 };
 
 export class CacheCredential {
+  static MAX_CLAIM_SIZE = 4000;
+
   static encode(credential: SignedCredential): CacheCredentialContract {
     const jsonCredential = credential.toJSON();
 
@@ -57,9 +58,9 @@ export class CacheCredential {
       encodedType: jsonCredential.type.join(','),
     };
 
-    if (cacheCredential.encodedClaim.length > 255) {
+    if (cacheCredential.encodedClaim.length > CacheCredential.MAX_CLAIM_SIZE) {
       throw new NotSupportedException(
-        `Unable to store credential: the encodedClaim is longer than 255 - ${cacheCredential.encodedClaim}`,
+        `Unable to store credential: the encodedClaim is longer than ${CacheCredential.MAX_CLAIM_SIZE} - ${cacheCredential.encodedClaim}`,
         LogContext.SSI
       );
     }
