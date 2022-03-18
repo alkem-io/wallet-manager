@@ -10,6 +10,7 @@ export const generateCredentialOffer = (
     type: credential.uniqueType,
     issuer: {
       id: issuer,
+      name: 'alkemio',
     },
     renderInfo: {
       background: { color: '#068293' }, // use Alkemio branding
