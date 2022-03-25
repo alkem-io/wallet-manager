@@ -5,12 +5,13 @@ import { Inject, Injectable, LoggerService } from '@nestjs/common';
 import { SignedCredential } from 'jolocom-lib/js/credentials/signedCredential/signedCredential';
 import { constraintFunctions } from 'jolocom-lib/js/interactionTokens/credentialRequest';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
-import { CredentialMetadataInput } from '../credentials/credential.dto.metadata';
 import {
   CacheCredential,
   SystemCredentials,
 } from '../credentials/system.credentials';
-import { BeginCredentialRequestInteractionOutput } from '../interactions/credential.request.interaction';
+import { WalletManagerCredentialMetadata } from './dto/wallet.manager.dto.credential.metadata';
+import { WalletManagerRequestVcBeginResponse } from './dto/wallet.manager.dto.request.vc.begin.response';
+import { WalletManagerRequestVcCompleteResponse } from './dto/wallet.manager.dto.request.vc.complete.response';
 
 export const generateRequirementsFromConfig = ({
   issuer,
@@ -32,9 +33,9 @@ export class SsiCredentialRequestInteractionService {
 
   async beginCredentialRequestInteraction(
     agent: Agent,
-    credentialMetadata: CredentialMetadataInput[],
+    credentialMetadata: WalletManagerCredentialMetadata[],
     uniqueCallbackURL: string
-  ): Promise<BeginCredentialRequestInteractionOutput> {
+  ): Promise<WalletManagerRequestVcBeginResponse> {
     const credentialRequirements = credentialMetadata.map(metadata => {
       return generateRequirementsFromConfig({
         metadata: {
@@ -56,10 +57,10 @@ export class SsiCredentialRequestInteractionService {
     };
   }
 
-  async completeCredentialShareInteraction(
+  async completeCredentialRequestInteraction(
     agent: Agent,
     jwt: string
-  ): Promise<boolean> {
+  ): Promise<WalletManagerRequestVcCompleteResponse> {
     const interaction = await agent.processJWT(jwt);
     const credentialState = (await interaction.getSummary()
       .state) as CredentialRequestFlowState;
@@ -103,6 +104,6 @@ export class SsiCredentialRequestInteractionService {
       await agent.storage.store.verifiableCredential(cacheCredential);
     }
 
-    return true;
+    return { result: true };
   }
 }

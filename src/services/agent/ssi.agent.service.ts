@@ -16,7 +16,7 @@ import { CredentialOfferRequestAttrs } from 'jolocom-lib/js/interactionTokens/ty
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Connection } from 'typeorm';
 import { CacheCredential, SystemCredentials } from '../credentials';
-import { CredentialMetadataInput } from '../credentials/credential.dto.metadata';
+import { WalletManagerCredentialMetadata } from '../interactions/dto/wallet.manager.dto.credential.metadata';
 
 export const generateRequirementsFromConfig = ({
   issuer,
@@ -72,7 +72,7 @@ export class SsiAgentService {
   async getVerifiedCredentials(
     did: string,
     password: string,
-    credentialMetadata: CredentialMetadataInput[]
+    credentialMetadata: WalletManagerCredentialMetadata[]
   ): Promise<VerifiedCredential[]> {
     const credentialsResult: VerifiedCredential[] = [];
     const agent = await this.jolocomSDK.loadAgent(password, did);
