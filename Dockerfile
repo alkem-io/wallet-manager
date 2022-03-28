@@ -22,6 +22,10 @@ RUN chmod +x /wait
 # If you are building your code for production
 # RUN npm ci --only=production
 
+# Create DB if it doesn't exist
+ADD .scripts/create_db.sh /create_db.sh
+RUN chmod +x /create_db.sh
+
 # Bundle app source & config files for TypeORM & TypeScript
 COPY ./src ./src
 COPY ./tsconfig.json .
@@ -32,4 +36,4 @@ RUN npm run build
 
 ENV NODE_ENV=${ENV_ARG}
 
-CMD ["/bin/sh", "-c", "npm run start:prod"]
+CMD ["/bin/sh", "-c", "/create_db.sh && npm run migration:run && npm run start:prod"]
