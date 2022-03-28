@@ -56,7 +56,7 @@ monitoring:
 # In particular, the migrations of the Jolocom database are still not setup, so any DID's created are not
 # guaranteed to be migrated properly.
 jolocom:
-    # The did method to use. Options are: jun, jolo. Latter is slow...
+  # The did method to use. Options are: jun, jolo. Latter is slow...
   method: ${DID_METHOD}:jolo
 
   # MySQL database configuration for usage by the Jolocom SDK.
@@ -64,7 +64,7 @@ jolocom:
   # Note: both schema / database name are used for configuration and they need to have the same value.
   database:
     # Database host.
-    host: ${DATABASE_HOST}:localhost
+    host: ${JOLOCOM_DATABASE_HOST}:localhost
 
     # MySQL daemon port.
     port: 3306
