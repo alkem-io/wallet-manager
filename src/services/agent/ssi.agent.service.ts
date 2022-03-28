@@ -10,13 +10,13 @@ import { ConfigService } from '@nestjs/config';
 import { InjectConnection } from '@nestjs/typeorm';
 import { NotSupportedException } from '@src/common/exceptions/not.supported.exception';
 import { Agent as AlkemioAgent } from '@src/types/agent';
-import { VerifiedCredential } from '@src/types/verified.credential';
+import { WalletManagerVerifiedCredential } from '@src/services/interactions/dto/wallet.manager.dto.verified.credential';
 import { constraintFunctions } from 'jolocom-lib/js/interactionTokens/credentialRequest';
 import { CredentialOfferRequestAttrs } from 'jolocom-lib/js/interactionTokens/types';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Connection } from 'typeorm';
 import { CacheCredential, SystemCredentials } from '../credentials';
-import { CredentialMetadataInput } from '../credentials/credential.dto.metadata';
+import { WalletManagerCredentialMetadata } from '../interactions/dto/wallet.manager.dto.credential.metadata';
 
 export const generateRequirementsFromConfig = ({
   issuer,
@@ -72,9 +72,9 @@ export class SsiAgentService {
   async getVerifiedCredentials(
     did: string,
     password: string,
-    credentialMetadata: CredentialMetadataInput[]
-  ): Promise<VerifiedCredential[]> {
-    const credentialsResult: VerifiedCredential[] = [];
+    credentialMetadata: WalletManagerCredentialMetadata[]
+  ): Promise<WalletManagerVerifiedCredential[]> {
+    const credentialsResult: WalletManagerVerifiedCredential[] = [];
     const agent = await this.jolocomSDK.loadAgent(password, did);
     const query: CredentialQuery = {};
     const credentials = await agent.credentials.query(query);
@@ -86,7 +86,7 @@ export class SsiAgentService {
       const context = metadata?.context || credential.context;
       const name = credential.name; // metadata?.name
 
-      let verifiedCredential: VerifiedCredential = {
+      let verifiedCredential: WalletManagerVerifiedCredential = {
         claim: JSON.stringify(claim),
         issuer: credential.issuer,
         type: credential.type[credential.type.length - 1],

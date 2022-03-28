@@ -5,11 +5,9 @@ import { Inject, Injectable, LoggerService } from '@nestjs/common';
 import { constraintFunctions } from 'jolocom-lib/js/interactionTokens/credentialRequest';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { generateCredentialOffer } from '../credentials';
-import { CredentialMetadataInput } from '../credentials/credential.dto.metadata';
-import {
-  BeginCredentialOfferInteractionOutput,
-  CompleteCredentialOfferInteractionOutput,
-} from './credential.offer.interaction';
+import { WalletManagerCredentialMetadata } from './dto/wallet.manager.dto.credential.metadata';
+import { WalletManagerOfferVcBeginResponse } from './dto/wallet.manager.dto.offer.vc.begin.response';
+import { WalletManagerOfferVcCompleteResponse } from './dto/wallet.manager.dto.offer.vc.complete.response';
 
 export const generateRequirementsFromConfig = ({
   issuer,
@@ -31,9 +29,9 @@ export class SsiCredentialOfferInteractionService {
 
   async beginCredentialOfferInteraction(
     jolocomAgent: Agent,
-    credentialMetadata: CredentialMetadataInput[],
+    credentialMetadata: WalletManagerCredentialMetadata[],
     uniqueCallbackURL: string
-  ): Promise<BeginCredentialOfferInteractionOutput> {
+  ): Promise<WalletManagerOfferVcBeginResponse> {
     const offerParameters: CredentialOfferRequestAttrs = {
       callbackURL: uniqueCallbackURL,
       offeredCredentials: credentialMetadata.map(cred =>
@@ -52,9 +50,9 @@ export class SsiCredentialOfferInteractionService {
   async completeCredentialOfferInteraction(
     agent: Agent,
     jwt: string,
-    credentialMetadata: CredentialMetadataInput[],
+    credentialMetadata: WalletManagerCredentialMetadata[],
     claimMap: Record<string, any>
-  ): Promise<CompleteCredentialOfferInteractionOutput> {
+  ): Promise<WalletManagerOfferVcCompleteResponse> {
     const interaction = await agent.processJWT(jwt);
     const credentialState = (await interaction.getSummary()
       .state) as CredentialOfferFlowState;
@@ -100,7 +98,6 @@ export class SsiCredentialOfferInteractionService {
     );
 
     return {
-      interactionId: offerToken.nonce,
       token: offerToken.encode(),
     };
   }
