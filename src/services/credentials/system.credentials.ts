@@ -1,4 +1,4 @@
-import { ISignedCredentialAttrs } from '@jolocom/protocol-ts';
+import { IClaimSection, ISignedCredentialAttrs } from '@jolocom/protocol-ts';
 import { NotSupportedException } from '@src/common';
 import { LogContext } from '@src/common/enums';
 import { SignedCredential } from 'jolocom-lib/js/credentials/signedCredential/signedCredential';
@@ -87,14 +87,25 @@ export class CacheCredential {
   static decode(encodedCredential: CacheCredentialContract): SignedCredential {
     const { encodedClaim, encodedType } = encodedCredential;
 
+    let claim: IClaimSection = {
+      id: '',
+    };
+    if (encodedClaim) {
+      claim = JSON.parse(encodedClaim);
+    }
+    let types: any[] = [];
+    if (encodedType) {
+      types = encodedType.split(',');
+    }
+
     const signedCredAttributes = {
       id: encodedCredential.id,
       issued: encodedCredential.issued,
       issuer: encodedCredential.issuer,
       expires: encodedCredential.expires,
       name: encodedCredential.name,
-      claim: JSON.parse(encodedClaim),
-      type: encodedType.split(','),
+      claim: claim,
+      type: types,
       proof: {
         id: encodedCredential['proof-id'],
         creator: encodedCredential['proof-creator'],

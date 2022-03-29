@@ -57,10 +57,11 @@ export class SsiCredentialRequestInteractionService {
     };
   }
 
-  async completeCredentialRequestInteraction(
+  async completeCredentialRequestInteractionJolocom(
     agent: Agent,
     jwt: string
   ): Promise<WalletManagerRequestVcCompleteResponse> {
+    this.logger.verbose?.(`Storing credential - ${jwt}`, LogContext.SSI);
     const interaction = await agent.processJWT(jwt);
     const credentialState = (await interaction.getSummary()
       .state) as CredentialRequestFlowState;
@@ -103,6 +104,30 @@ export class SsiCredentialRequestInteractionService {
 
       await agent.storage.store.verifiableCredential(cacheCredential);
     }
+
+    return { result: true };
+  }
+
+  async completeCredentialRequestInteractionSovrhd(
+    agent: Agent,
+    jwt: string,
+    credentialType: string
+  ): Promise<WalletManagerRequestVcCompleteResponse> {
+    this.logger.verbose?.(`Storing Sovrhd credential - ${jwt}`, LogContext.SSI);
+
+    const cacheCredential = await agent.credentials.issue({
+      subject: agent.identityWallet.did,
+      claim: {
+        presentation: jwt,
+      },
+      metadata: {
+        name: 'Cache credential',
+        type: [SystemCredentials.CacheCredential, credentialType],
+        context: [CacheCredential.context],
+      },
+    });
+
+    await agent.storage.store.verifiableCredential(cacheCredential);
 
     return { result: true };
   }
