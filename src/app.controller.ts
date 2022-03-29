@@ -54,7 +54,7 @@ export class AppController {
     @Ctx() context: RmqContext
   ): Promise<WalletManagerGetAgentInfoResponse> {
     this.logger.verbose?.(
-      `getIdentityInfo - payload: ${JSON.stringify(data)}`,
+      `getIdentityInfo - for: ${data.did}`,
       LogContext.EVENT
     );
     const channel = context.getChannelRef();
