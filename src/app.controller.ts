@@ -29,7 +29,9 @@ export class AppController {
     @Ctx() context: RmqContext
   ): Promise<WalletManagerCreateIdentityResponse> {
     this.logger.verbose?.(
-      `createIdentity - payload: ${JSON.stringify(data)}`,
+      `${WalletManagerCommand.CREATE_IDENTITY} - payload: ${JSON.stringify(
+        data
+      )}`,
       LogContext.EVENT
     );
     const channel = context.getChannelRef();
@@ -54,7 +56,7 @@ export class AppController {
     @Ctx() context: RmqContext
   ): Promise<WalletManagerGetAgentInfoResponse> {
     this.logger.verbose?.(
-      `getIdentityInfo - for: ${data.did}`,
+      `${WalletManagerCommand.GET_IDENTITY_INFO} - for: ${data.did}`,
       LogContext.EVENT
     );
     const channel = context.getChannelRef();

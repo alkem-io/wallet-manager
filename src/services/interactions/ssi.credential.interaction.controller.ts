@@ -49,7 +49,7 @@ export class CredentialInteractionController {
     @Ctx() context: RmqContext
   ) {
     this.logger.verbose?.(
-      `beginCredentialRequestInteraction - payload: ${JSON.stringify(data)}`,
+      `beginCredentialRequestInteraction - for did: ${data.issuerDID} + callback ${data.uniqueCallbackURL}`,
       LogContext.EVENT
     );
     const channel = context.getChannelRef();
@@ -92,9 +92,7 @@ export class CredentialInteractionController {
     @Ctx() context: RmqContext
   ): Promise<WalletManagerRequestVcCompleteResponse> {
     this.logger.verbose?.(
-      `completeCredentialShareInteractionSovrhd - payload: ${JSON.stringify(
-        data
-      )}`,
+      `${WalletManagerCommand.COMPLETE_CREDENTIAL_REQUEST_INTERACTION_SOVRHD} - for did: ${data.issuerDID} + credential type: ${data.credentialType}`,
       LogContext.EVENT
     );
     const channel = context.getChannelRef();
@@ -191,7 +189,7 @@ export class CredentialInteractionController {
     @Ctx() context: RmqContext
   ): Promise<WalletManagerOfferVcBeginResponse> {
     this.logger.verbose?.(
-      `beginCredentialOfferInteraction - payload: ${JSON.stringify(data)}`,
+      `${WalletManagerCommand.BEGIN_CREDENTIAL_OFFER_INTERACTION} - for did: ${data.issuerDID} + offering credentials ${data.offeredCredentials}`,
       LogContext.EVENT
     );
     const channel = context.getChannelRef();
@@ -238,7 +236,11 @@ export class CredentialInteractionController {
     @Ctx() context: RmqContext
   ): Promise<WalletManagerOfferVcCompleteResponse> {
     this.logger.verbose?.(
-      `completeCredentialOfferInteraction - payload: ${JSON.stringify(data)}`,
+      `${
+        WalletManagerCommand.COMPLETE_CREDENTIAL_OFFER_INTERACTION
+      } - for did: ${data.issuerDID} and returning token: ${JSON.stringify(
+        data.jwt
+      )}`,
       LogContext.EVENT
     );
     const channel = context.getChannelRef();

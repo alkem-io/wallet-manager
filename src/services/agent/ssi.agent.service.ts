@@ -129,7 +129,7 @@ export class SsiAgentService {
       }
     }
     this.logger.verbose?.(
-      `Returning credentials: '${JSON.stringify(credentialsResult)}'`,
+      `Returning ${credentialsResult.length} credentials for did: '${did}'`,
       LogContext.SSI
     );
     return credentialsResult;
