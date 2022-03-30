@@ -49,7 +49,7 @@ export class CredentialInteractionController {
     @Ctx() context: RmqContext
   ) {
     this.logger.verbose?.(
-      `beginCredentialRequestInteraction - for did: ${data.issuerDID} + callback ${data.uniqueCallbackURL}`,
+      `${WalletManagerCommand.BEGIN_CREDENTIAL_REQUEST_INTERACTION} - for did: ${data.issuerDID} + callback ${data.uniqueCallbackURL}`,
       LogContext.EVENT
     );
     const channel = context.getChannelRef();
@@ -140,9 +140,7 @@ export class CredentialInteractionController {
     @Ctx() context: RmqContext
   ): Promise<WalletManagerRequestVcCompleteResponse> {
     this.logger.verbose?.(
-      `completeCredentialShareInteractionJolocm - payload: ${JSON.stringify(
-        data
-      )}`,
+      `${WalletManagerCommand.COMPLETE_CREDENTIAL_REQUEST_INTERACTION_JOLOCOM} - did: ${data.issuerDID}`,
       LogContext.EVENT
     );
     const channel = context.getChannelRef();
