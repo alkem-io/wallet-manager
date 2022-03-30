@@ -1,9 +1,9 @@
 import { CredentialOffer, CredentialRenderTypes } from '@jolocom/protocol-ts';
-import { CredentialMetadataInput } from './credential.dto.metadata';
+import { WalletManagerCredentialMetadata } from '../interactions/dto/wallet.manager.dto.credential.metadata';
 
 // this might also belong to the trust registry - should be discussed
 export const generateCredentialOffer = (
-  credential: CredentialMetadataInput,
+  credential: WalletManagerCredentialMetadata,
   issuer: string
 ): CredentialOffer => {
   return {

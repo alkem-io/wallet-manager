@@ -1,4 +1,4 @@
-export type CredentialMetadataInput = {
+export type WalletManagerCredentialMetadata = {
   name: string;
   description: string;
   schema: string;

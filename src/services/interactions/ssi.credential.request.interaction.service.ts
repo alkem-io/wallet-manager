@@ -5,12 +5,12 @@ import { Inject, Injectable, LoggerService } from '@nestjs/common';
 import { SignedCredential } from 'jolocom-lib/js/credentials/signedCredential/signedCredential';
 import { constraintFunctions } from 'jolocom-lib/js/interactionTokens/credentialRequest';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
-import { CredentialMetadataInput } from '../credentials/credential.dto.metadata';
-import {
-  CacheCredential,
-  SystemCredentials,
-} from '../credentials/system.credentials';
-import { BeginCredentialRequestInteractionOutput } from '../interactions/credential.request.interaction';
+import { CacheCredentialService } from '../cache.credential/ssi.cache.credential.service';
+import { SystemCredentials } from '../credentials/system.credentials';
+import { WalletManagerCredentialMetadata } from './dto/wallet.manager.dto.credential.metadata';
+import { WalletManagerSovrhdCredential } from './dto/wallet.manager.dto.credential.sovrhd';
+import { WalletManagerRequestVcBeginResponse } from './dto/wallet.manager.dto.request.vc.begin.response';
+import { WalletManagerRequestVcCompleteResponse } from './dto/wallet.manager.dto.request.vc.complete.response';
 
 export const generateRequirementsFromConfig = ({
   issuer,
@@ -27,14 +27,15 @@ export const generateRequirementsFromConfig = ({
 export class SsiCredentialRequestInteractionService {
   constructor(
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
-    private readonly logger: LoggerService
+    private readonly logger: LoggerService,
+    private cacheCredentialService: CacheCredentialService
   ) {}
 
   async beginCredentialRequestInteraction(
     agent: Agent,
-    credentialMetadata: CredentialMetadataInput[],
+    credentialMetadata: WalletManagerCredentialMetadata[],
     uniqueCallbackURL: string
-  ): Promise<BeginCredentialRequestInteractionOutput> {
+  ): Promise<WalletManagerRequestVcBeginResponse> {
     const credentialRequirements = credentialMetadata.map(metadata => {
       return generateRequirementsFromConfig({
         metadata: {
@@ -56,10 +57,14 @@ export class SsiCredentialRequestInteractionService {
     };
   }
 
-  async completeCredentialShareInteraction(
+  async completeCredentialRequestInteractionJolocom(
     agent: Agent,
     jwt: string
-  ): Promise<boolean> {
+  ): Promise<WalletManagerRequestVcCompleteResponse> {
+    this.logger.verbose?.(
+      `Storing credential - ${jwt.substring(0, 30)}...`,
+      LogContext.SSI
+    );
     const interaction = await agent.processJWT(jwt);
     const credentialState = (await interaction.getSummary()
       .state) as CredentialRequestFlowState;
@@ -87,7 +92,8 @@ export class SsiCredentialRequestInteractionService {
 
     for (const credential of verifiedCredentials) {
       const jsonCredential = credential.toJSON();
-      const serializedCredential = CacheCredential.encode(credential);
+      const serializedCredential =
+        this.cacheCredentialService.encode(credential);
       const cacheCredential = await agent.credentials.issue({
         subject: agent.identityWallet.did,
         claim: {
@@ -96,13 +102,46 @@ export class SsiCredentialRequestInteractionService {
         metadata: {
           name: 'Cache credential',
           type: [SystemCredentials.CacheCredential, ...jsonCredential.type],
-          context: [CacheCredential.context],
+          context: [this.cacheCredentialService.getContext()],
         },
       });
 
       await agent.storage.store.verifiableCredential(cacheCredential);
     }
 
-    return true;
+    return { result: true };
+  }
+
+  async completeCredentialRequestInteractionSovrhd(
+    agent: Agent,
+    sovrhdCredStr: string,
+    credentialType: string
+  ): Promise<WalletManagerRequestVcCompleteResponse> {
+    const sovrhdCred: WalletManagerSovrhdCredential = JSON.parse(sovrhdCredStr);
+    this.logger.verbose?.(
+      `Storing Sovrhd credential - ${sovrhdCredStr}`,
+      LogContext.SSI
+    );
+
+    const serializedCredential = this.cacheCredentialService.encodeSovrhd(
+      sovrhdCred,
+      credentialType
+    );
+
+    const cacheCredential = await agent.credentials.issue({
+      subject: agent.identityWallet.did,
+      claim: {
+        ...serializedCredential,
+      },
+      metadata: {
+        name: 'Cache credential',
+        type: [SystemCredentials.CacheCredential, ...sovrhdCred.type],
+        context: [this.cacheCredentialService.getContext()],
+      },
+    });
+
+    await agent.storage.store.verifiableCredential(cacheCredential);
+
+    return { result: true };
   }
 }

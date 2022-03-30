@@ -1,22 +1,19 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { ConfigurationTypes } from '@common/enums';
 import { LogContext } from '@common/enums/logging.context';
 import { Agent, JolocomSDK } from '@jolocom/sdk';
 import { JolocomTypeormStorage } from '@jolocom/sdk-storage-typeorm';
-import { CredentialOfferFlowState } from '@jolocom/sdk/js/interactionManager/types';
 import { CredentialQuery, IStorage } from '@jolocom/sdk/js/storage';
 import { Inject, Injectable, LoggerService } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectConnection } from '@nestjs/typeorm';
 import { NotSupportedException } from '@src/common/exceptions/not.supported.exception';
-import { Agent as AlkemioAgent } from '@src/types/agent';
-import { VerifiedCredential } from '@src/types/verified.credential';
+import { WalletManagerVerifiedCredential } from '@src/services/interactions/dto/wallet.manager.dto.verified.credential';
 import { constraintFunctions } from 'jolocom-lib/js/interactionTokens/credentialRequest';
-import { CredentialOfferRequestAttrs } from 'jolocom-lib/js/interactionTokens/types';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Connection } from 'typeorm';
-import { CacheCredential, SystemCredentials } from '../credentials';
-import { CredentialMetadataInput } from '../credentials/credential.dto.metadata';
+import { CacheCredentialService } from '../cache.credential/ssi.cache.credential.service';
+import { SystemCredentials } from '../credentials';
+import { WalletManagerCredentialMetadata } from '../interactions/dto/wallet.manager.dto.credential.metadata';
 
 export const generateRequirementsFromConfig = ({
   issuer,
@@ -40,7 +37,8 @@ export class SsiAgentService {
     private typeormConnection: Connection,
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: LoggerService,
-    private configService: ConfigService
+    private configService: ConfigService,
+    private cacheCredentialService: CacheCredentialService
   ) {
     const storage: IStorage = new JolocomTypeormStorage(this.typeormConnection);
     this.jolocomSDK = new JolocomSDK({ storage });
@@ -72,9 +70,9 @@ export class SsiAgentService {
   async getVerifiedCredentials(
     did: string,
     password: string,
-    credentialMetadata: CredentialMetadataInput[]
-  ): Promise<VerifiedCredential[]> {
-    const credentialsResult: VerifiedCredential[] = [];
+    credentialMetadata: WalletManagerCredentialMetadata[]
+  ): Promise<WalletManagerVerifiedCredential[]> {
+    const credentialsResult: WalletManagerVerifiedCredential[] = [];
     const agent = await this.jolocomSDK.loadAgent(password, did);
     const query: CredentialQuery = {};
     const credentials = await agent.credentials.query(query);
@@ -86,12 +84,12 @@ export class SsiAgentService {
       const context = metadata?.context || credential.context;
       const name = credential.name; // metadata?.name
 
-      let verifiedCredential: VerifiedCredential = {
+      let verifiedCredential: WalletManagerVerifiedCredential = {
         claim: JSON.stringify(claim),
         issuer: credential.issuer,
         type: credential.type[credential.type.length - 1],
         issued: credential.issued,
-        expires: credential.expires,
+        expires: credential.expires || 0,
         context: JSON.stringify(context),
         name: name,
       };
@@ -99,133 +97,42 @@ export class SsiAgentService {
       try {
         // TODO isolate logic in wrap/unwrap methods for CachedCredentials
         if (credential.type.indexOf(SystemCredentials.CacheCredential) !== -1) {
-          const signedCredential = CacheCredential.decode(
+          const signedCredential = this.cacheCredentialService.decode(
             credential.claim as any
           );
-
-          verifiedCredential = {
-            claim: JSON.stringify(signedCredential.claim),
-            issuer: signedCredential.issuer,
-            type: signedCredential.type[signedCredential.type.length - 1],
-            issued: signedCredential.issued,
-            expires: credential.expires,
-            context: JSON.stringify(context),
-            name: signedCredential.name,
-          };
+          this.logger.verbose?.(
+            `Identified cached credential claim: ${signedCredential.name}`,
+            LogContext.CLAIM
+          );
+          if (signedCredential.issuer) {
+            verifiedCredential = {
+              claim: JSON.stringify(signedCredential.claim),
+              issuer: signedCredential.issuer,
+              type: signedCredential.type[signedCredential.type.length - 1],
+              issued: signedCredential.issued,
+              expires: credential.expires,
+              context: JSON.stringify(context),
+              name: signedCredential.name,
+            };
+          }
         }
 
         credentialsResult.push(verifiedCredential);
         this.logger.verbose?.(
-          `${JSON.stringify(verifiedCredential.claim)}`,
-          LogContext.AUTH
+          `Retrieved claim: ${verifiedCredential.name}`,
+          LogContext.CLAIM
         );
       } catch (error) {
         this.logger.error(
           `Unable to retrieve credential '${credential.type}': ${error}`,
-          LogContext.SSI
+          LogContext.CLAIM
         );
       }
     }
+    this.logger.verbose?.(
+      `Returning ${credentialsResult.length} credentials for did: '${did}'`,
+      LogContext.SSI
+    );
     return credentialsResult;
-  }
-
-  // TODO Clean this up
-  async grantStateTransitionVC(
-    issuerDid: string,
-    issuerPW: string,
-    receiverDid: string,
-    receiverPw: string,
-    challengeID: string,
-    userID: string
-  ): Promise<boolean> {
-    const issuerAgent = await this.jolocomSDK.loadAgent(issuerPW, issuerDid);
-    const receiverAgent = await this.jolocomSDK.loadAgent(
-      receiverPw,
-      receiverDid
-    );
-
-    this.logger.verbose?.('About to issue a credential...', LogContext.SSI);
-
-    // Issuer creates the offer to receiver to sign a simple credential
-    const offer: CredentialOfferRequestAttrs = {
-      callbackURL: 'https://example.com/issuance',
-      offeredCredentials: [
-        {
-          type: 'TODO', //RecognizedCredentials.StateModificationCredential,
-        },
-      ],
-    };
-    const issuerCredOffer = await issuerAgent.credOfferToken(offer);
-
-    // Receiver gets and processes the offered token, to identify the relevant Interaction
-    const receiverCredExchangeInteraction = await receiverAgent.processJWT(
-      issuerCredOffer.encode()
-    );
-
-    // Receiver then creates a response token
-    const receiverCredExchangeResponse =
-      await receiverCredExchangeInteraction.createCredentialOfferResponseToken([
-        { type: 'RecognizedCredentials.StateModificationCredential' },
-      ]);
-
-    // Note that all agents need to also process the tokens they generate so that their interaction manager has seen all messages
-    await receiverAgent.processJWT(receiverCredExchangeResponse.encode());
-
-    // Issuer receives the token response from Receiver, finds the interaction + then creates the VC to share
-    const issuerCredExchangeInteraction = await issuerAgent.processJWT(
-      receiverCredExchangeResponse.encode()
-    );
-
-    // Create the VC that then will be issued by Alice to Bob, so that Bob can then prove that Alice attested to this credential about him.
-    const issuerAboutReceiverVC = await issuerAgent.signedCredential({
-      metadata: {
-        name: 'TODO',
-        type: ['TODO'],
-      },
-      subject: receiverAgent.identityWallet.did,
-      claim: {
-        challengeID: challengeID,
-        userID: userID,
-      },
-    });
-
-    // Create the token wrapping the VC
-    const aliceCredIssuance =
-      await issuerCredExchangeInteraction.createCredentialReceiveToken([
-        issuerAboutReceiverVC,
-      ]);
-    // Issuer processes her own generated token also
-    await issuerAgent.processJWT(aliceCredIssuance.encode());
-
-    // Token with signed VC is sent and received by Bob
-    const receiverCredExchangeInteraction2 = await receiverAgent.processJWT(
-      aliceCredIssuance.encode()
-    );
-    const state = receiverCredExchangeInteraction2.getSummary()
-      .state as CredentialOfferFlowState;
-
-    if (state.credentialsAllValid) {
-      this.logger.verbose?.('Issued credential interaction is valid!');
-      await receiverCredExchangeInteraction2.storeSelectedCredentials();
-    }
-
-    return true;
-  }
-
-  async authorizeStateModification(
-    issuingAgent: AlkemioAgent,
-    issuingResourceID: string,
-    receivingAgent: AlkemioAgent,
-    receivingResourceID: string
-  ): Promise<boolean> {
-    await this.grantStateTransitionVC(
-      issuingAgent.did,
-      issuingAgent.password,
-      receivingAgent.did,
-      receivingAgent.password,
-      issuingResourceID,
-      receivingResourceID
-    );
-    return true;
   }
 }

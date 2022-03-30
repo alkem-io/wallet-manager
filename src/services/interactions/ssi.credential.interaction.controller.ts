@@ -17,18 +17,17 @@ import { SsiAgentService } from '@src/services/agent/ssi.agent.service';
 import { SsiCredentialRequestInteractionService } from './ssi.credential.request.interaction.service';
 import { Cache } from 'cache-manager';
 import { LogContext } from '@src/common/enums';
-import {
-  BeginCredentialRequestInteractionInput as BeginCredentialRequestInteractionInput,
-  CompleteCredentialRequestInteractionInput as CompleteCredentialRequestInteractionInput,
-} from './credential.request.interaction';
-import {
-  BeginCredentialOfferInteractionInput,
-  BeginCredentialOfferInteractionOutput,
-  CompleteCredentialOfferInteractionInput,
-  CompleteCredentialOfferInteractionOutput,
-} from './credential.offer.interaction';
 import { SsiCredentialOfferInteractionService } from './ssi.credential.offer.interaction.service';
 import jwt_decode from 'jwt-decode';
+import { WalletManagerCommand } from '@src/common/enums/wallet.manager.command';
+import { WalletManagerRequestVcBegin } from './dto/wallet.manager.dto.request.vc.begin';
+import { WalletManagerRequestVcComplete } from './dto/wallet.manager.dto.request.vc.complete';
+import { WalletManagerOfferVcBegin } from './dto/wallet.manager.dto.offer.vc.begin';
+import { WalletManagerOfferVcBeginResponse } from './dto/wallet.manager.dto.offer.vc.begin.response';
+import { WalletManagerRequestVcCompleteResponse } from './dto/wallet.manager.dto.request.vc.complete.response';
+import { WalletManagerOfferVcCompleteResponse } from './dto/wallet.manager.dto.offer.vc.complete.response';
+import { WalletManagerOfferVcComplete } from './dto/wallet.manager.dto.offer.vc.complete';
+import { WalletManagerRequestVcCompleteSovrhd } from './dto/wallet.manager.dto.request.vc.complete.sovrhd';
 
 @Controller()
 export class CredentialInteractionController {
@@ -42,13 +41,15 @@ export class CredentialInteractionController {
     private cacheManager: Cache
   ) {}
 
-  @MessagePattern({ cmd: 'beginCredentialRequestInteraction' })
+  @MessagePattern({
+    cmd: WalletManagerCommand.BEGIN_CREDENTIAL_REQUEST_INTERACTION,
+  })
   async beginCredentialRequestInteraction(
-    @Payload() data: BeginCredentialRequestInteractionInput,
+    @Payload() data: WalletManagerRequestVcBegin,
     @Ctx() context: RmqContext
   ) {
     this.logger.verbose?.(
-      `beginCredentialRequestInteraction - payload: ${JSON.stringify(data)}`,
+      `${WalletManagerCommand.BEGIN_CREDENTIAL_REQUEST_INTERACTION} - for did: ${data.issuerDID} + callback ${data.uniqueCallbackURL}`,
       LogContext.EVENT
     );
     const channel = context.getChannelRef();
@@ -56,7 +57,7 @@ export class CredentialInteractionController {
 
     try {
       const agent = await this.ssiAgentService.loadAgent(
-        data.issuerDId,
+        data.issuerDID,
         data.issuerPassword
       );
       const beginCredentialRequestToken =
@@ -66,7 +67,7 @@ export class CredentialInteractionController {
           data.uniqueCallbackURL
         );
 
-      this.cacheManager.set<BeginCredentialRequestInteractionInput>(
+      this.cacheManager.set<WalletManagerRequestVcBegin>(
         beginCredentialRequestToken.interactionId,
         data,
         // time it so that it will expire at  the same time as the token
@@ -83,13 +84,15 @@ export class CredentialInteractionController {
     }
   }
 
-  @MessagePattern({ cmd: 'completeCredentialRequestInteraction' })
-  async completeCredentialRequestInteraction(
-    @Payload() data: CompleteCredentialRequestInteractionInput,
+  @MessagePattern({
+    cmd: WalletManagerCommand.COMPLETE_CREDENTIAL_REQUEST_INTERACTION_SOVRHD,
+  })
+  async completeCredentialRequestInteractionSovrhd(
+    @Payload() data: WalletManagerRequestVcCompleteSovrhd,
     @Ctx() context: RmqContext
-  ): Promise<boolean> {
+  ): Promise<WalletManagerRequestVcCompleteResponse> {
     this.logger.verbose?.(
-      `completeCredentialShareInteraction - payload: ${JSON.stringify(data)}`,
+      `${WalletManagerCommand.COMPLETE_CREDENTIAL_REQUEST_INTERACTION_SOVRHD} - for did: ${data.issuerDID} + credential type: ${data.credentialType}`,
       LogContext.EVENT
     );
     const channel = context.getChannelRef();
@@ -97,7 +100,7 @@ export class CredentialInteractionController {
 
     try {
       const request =
-        await this.cacheManager.get<BeginCredentialRequestInteractionInput>(
+        await this.cacheManager.get<WalletManagerRequestVcComplete>(
           data.interactionId
         );
 
@@ -108,12 +111,60 @@ export class CredentialInteractionController {
       }
 
       const agent = await this.ssiAgentService.loadAgent(
-        request.issuerDId,
+        request.issuerDID,
         request.issuerPassword
       );
 
       const interactionComplete =
-        await this.requestInteractionService.completeCredentialShareInteraction(
+        await this.requestInteractionService.completeCredentialRequestInteractionSovrhd(
+          agent,
+          data.jwt,
+          data.credentialType
+        );
+
+      channel.ack(originalMsg);
+      return interactionComplete;
+    } catch (error) {
+      const errorMessage = `Error when storing credentials: ${error}`;
+      this.logger.error(errorMessage, LogContext.SSI);
+      channel.ack(originalMsg);
+      throw new RpcException(errorMessage);
+    }
+  }
+
+  @MessagePattern({
+    cmd: WalletManagerCommand.COMPLETE_CREDENTIAL_REQUEST_INTERACTION_JOLOCOM,
+  })
+  async completeCredentialRequestInteractionJolocom(
+    @Payload() data: WalletManagerRequestVcComplete,
+    @Ctx() context: RmqContext
+  ): Promise<WalletManagerRequestVcCompleteResponse> {
+    this.logger.verbose?.(
+      `${WalletManagerCommand.COMPLETE_CREDENTIAL_REQUEST_INTERACTION_JOLOCOM} - did: ${data.issuerDID}`,
+      LogContext.EVENT
+    );
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+
+    try {
+      const request =
+        await this.cacheManager.get<WalletManagerRequestVcComplete>(
+          data.interactionId
+        );
+
+      if (!request) {
+        throw new PreconditionFailedException(
+          `The interactionId could not be found: ${data.interactionId}`
+        );
+      }
+
+      const agent = await this.ssiAgentService.loadAgent(
+        request.issuerDID,
+        request.issuerPassword
+      );
+
+      const interactionComplete =
+        await this.requestInteractionService.completeCredentialRequestInteractionJolocom(
           agent,
           data.jwt
         );
@@ -128,13 +179,15 @@ export class CredentialInteractionController {
     }
   }
 
-  @MessagePattern({ cmd: 'beginCredentialOfferInteraction' })
+  @MessagePattern({
+    cmd: WalletManagerCommand.BEGIN_CREDENTIAL_OFFER_INTERACTION,
+  })
   async beginCredentialOfferInteraction(
-    @Payload() data: BeginCredentialOfferInteractionInput,
+    @Payload() data: WalletManagerOfferVcBegin,
     @Ctx() context: RmqContext
-  ): Promise<BeginCredentialOfferInteractionOutput> {
+  ): Promise<WalletManagerOfferVcBeginResponse> {
     this.logger.verbose?.(
-      `beginCredentialOfferInteraction - payload: ${JSON.stringify(data)}`,
+      `${WalletManagerCommand.BEGIN_CREDENTIAL_OFFER_INTERACTION} - for did: ${data.issuerDID} + offering credentials ${data.offeredCredentials}`,
       LogContext.EVENT
     );
     const channel = context.getChannelRef();
@@ -142,7 +195,7 @@ export class CredentialInteractionController {
 
     try {
       const agent = await this.ssiAgentService.loadAgent(
-        data.issuerDId,
+        data.issuerDID,
         data.issuerPassword
       );
       const beginCredentialOfferOutput =
@@ -152,7 +205,7 @@ export class CredentialInteractionController {
           data.uniqueCallbackURL
         );
 
-      this.cacheManager.set<BeginCredentialOfferInteractionInput>(
+      this.cacheManager.set<WalletManagerOfferVcBegin>(
         beginCredentialOfferOutput.interactionId,
         data,
         // time it so that it will expire at  the same time as the token
@@ -173,23 +226,28 @@ export class CredentialInteractionController {
     }
   }
 
-  @MessagePattern({ cmd: 'completeCredentialOfferInteraction' })
+  @MessagePattern({
+    cmd: WalletManagerCommand.COMPLETE_CREDENTIAL_OFFER_INTERACTION,
+  })
   async completeCredentialOfferInteraction(
-    @Payload() data: CompleteCredentialOfferInteractionInput,
+    @Payload() data: WalletManagerOfferVcComplete,
     @Ctx() context: RmqContext
-  ): Promise<CompleteCredentialOfferInteractionOutput> {
+  ): Promise<WalletManagerOfferVcCompleteResponse> {
     this.logger.verbose?.(
-      `completeCredentialOfferInteraction - payload: ${JSON.stringify(data)}`,
+      `${
+        WalletManagerCommand.COMPLETE_CREDENTIAL_OFFER_INTERACTION
+      } - for did: ${data.issuerDID} and returning token: ${JSON.stringify(
+        data.jwt
+      )}`,
       LogContext.EVENT
     );
     const channel = context.getChannelRef();
     const originalMsg = context.getMessage();
 
     try {
-      const request =
-        await this.cacheManager.get<BeginCredentialOfferInteractionInput>(
-          data.interactionId
-        );
+      const request = await this.cacheManager.get<WalletManagerOfferVcBegin>(
+        data.interactionId
+      );
 
       if (!request) {
         throw new PreconditionFailedException(
@@ -198,7 +256,7 @@ export class CredentialInteractionController {
       }
 
       const agent = await this.ssiAgentService.loadAgent(
-        request.issuerDId,
+        request.issuerDID,
         request.issuerPassword
       );
 
