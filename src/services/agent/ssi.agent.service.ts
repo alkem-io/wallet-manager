@@ -1,21 +1,18 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { ConfigurationTypes } from '@common/enums';
 import { LogContext } from '@common/enums/logging.context';
 import { Agent, JolocomSDK } from '@jolocom/sdk';
 import { JolocomTypeormStorage } from '@jolocom/sdk-storage-typeorm';
-import { CredentialOfferFlowState } from '@jolocom/sdk/js/interactionManager/types';
 import { CredentialQuery, IStorage } from '@jolocom/sdk/js/storage';
 import { Inject, Injectable, LoggerService } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectConnection } from '@nestjs/typeorm';
 import { NotSupportedException } from '@src/common/exceptions/not.supported.exception';
-import { Agent as AlkemioAgent } from '@src/types/agent';
 import { WalletManagerVerifiedCredential } from '@src/services/interactions/dto/wallet.manager.dto.verified.credential';
 import { constraintFunctions } from 'jolocom-lib/js/interactionTokens/credentialRequest';
-import { CredentialOfferRequestAttrs } from 'jolocom-lib/js/interactionTokens/types';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Connection } from 'typeorm';
-import { CacheCredential, SystemCredentials } from '../credentials';
+import { CacheCredentialService } from '../cache.credential/ssi.cache.credential.service';
+import { SystemCredentials } from '../credentials';
 import { WalletManagerCredentialMetadata } from '../interactions/dto/wallet.manager.dto.credential.metadata';
 
 export const generateRequirementsFromConfig = ({
@@ -40,7 +37,8 @@ export class SsiAgentService {
     private typeormConnection: Connection,
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: LoggerService,
-    private configService: ConfigService
+    private configService: ConfigService,
+    private cacheCredentialService: CacheCredentialService
   ) {
     const storage: IStorage = new JolocomTypeormStorage(this.typeormConnection);
     this.jolocomSDK = new JolocomSDK({ storage });
@@ -99,10 +97,13 @@ export class SsiAgentService {
       try {
         // TODO isolate logic in wrap/unwrap methods for CachedCredentials
         if (credential.type.indexOf(SystemCredentials.CacheCredential) !== -1) {
-          const signedCredential = CacheCredential.decode(
+          const signedCredential = this.cacheCredentialService.decode(
             credential.claim as any
           );
-
+          this.logger.verbose?.(
+            `Identified cached credential claim: ${signedCredential.name}`,
+            LogContext.CLAIM
+          );
           if (signedCredential.issuer) {
             verifiedCredential = {
               claim: JSON.stringify(signedCredential.claim),
@@ -118,18 +119,18 @@ export class SsiAgentService {
 
         credentialsResult.push(verifiedCredential);
         this.logger.verbose?.(
-          `${JSON.stringify(verifiedCredential.claim)}`,
-          LogContext.AUTH
+          `Retrieved claim: ${verifiedCredential.name}`,
+          LogContext.CLAIM
         );
       } catch (error) {
         this.logger.error(
           `Unable to retrieve credential '${credential.type}': ${error}`,
-          LogContext.SSI
+          LogContext.CLAIM
         );
       }
     }
     this.logger.verbose?.(
-      `Returning credentials: '${JSON.stringify(credentialsResult)}'`,
+      `Returning ${credentialsResult.length} credentials for did: '${did}'`,
       LogContext.SSI
     );
     return credentialsResult;
