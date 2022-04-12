@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: alkemio-wallet-manager
-          image: ctdev.azurecr.io/alkemio-wallet-manager:latest
+          image: alkemio.azurecr.io/alkemio-wallet-manager:latest
           env:
             - name: RABBITMQ_HOST
               valueFrom:
